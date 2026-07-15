@@ -1,8 +1,6 @@
-/** Персоналізація листівки — редагуй тут */
+/** Персоналізація листівки */
 export const CONFIG = {
-  herName: "Іро",
-  herNameEn: "Ira",
-  greetingTitle: "З Днем Народження!",
+  greetingTitle: "З Днем Народження, кохана!",
   greetingBody: `Сьогодні весь світ трохи яскравіший — бо це твій день.
 
 Ти — моє сонце, моя тиха гавань і найкраща пригода в житті.
@@ -10,13 +8,8 @@ export const CONFIG = {
 скільки ти даруєш усім навколо.
 
 Дякую, що ти є. Я тебе безмежно кохаю.`,
-  fromName: "З любов'ю, твій Олексій",
-  finalMessage: "Обіймаю міцно-міцно 🤍",
-  photos: [
-    // "assets/photos/1.jpg",
-    // "assets/photos/2.jpg",
-    // "assets/photos/3.jpg",
-  ],
+  fromName: "твій коханий",
+  wishText: "Загадай бажання, поки падає зірка…",
   melodyEnabled: false,
-  siteTitle: "Для Іри 💕",
+  siteTitle: "Для коханої",
 };

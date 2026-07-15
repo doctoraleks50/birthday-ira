@@ -3,71 +3,46 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#1a0a2e" />
-  <meta name="description" content="З Днем Народження, Іро!" />
-  <title>Для Іри 💕</title>
+  <meta name="theme-color" content="#0a0618" />
+  <meta name="description" content="З Днем Народження, кохана" />
+  <title>Для коханої</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Great+Vibes&family=Playfair+Display:ital,wght@0,500;0,700;1,500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <div id="sky"></div>
-  <div id="bokeh" aria-hidden="true"></div>
   <canvas id="scene3d" aria-hidden="true"></canvas>
 
-  <!-- Intro -->
-  <div id="intro" class="overlay">
-    <div class="intro-inner">
-      <div class="intro-heart" aria-hidden="true">💗</div>
-      <p class="intro-whisper">Для тебе, Іро…</p>
-      <h1 class="intro-title">Казка на один день</h1>
-      <button id="enter-btn" class="btn-primary" type="button">
-        Увійти в казку ✨
-      </button>
-      <p class="intro-hint">Натисни — і почнеться магія (поки без музики)</p>
+  <!-- 1. Intro -->
+  <section id="intro" class="overlay scene">
+    <div class="panel">
+      <div class="pulse-heart" aria-hidden="true"></div>
+      <p class="whisper">Для тебе…</p>
+      <button id="open-btn" class="btn-primary" type="button">Відкрити</button>
     </div>
-  </div>
+  </section>
 
-  <!-- Lyrics bar -->
-  <div id="lyrics-bar" class="lyrics-bar hidden" aria-live="polite">
-    <span id="lyrics-text"></span>
-  </div>
-
-  <!-- Main card -->
-  <main id="main" class="main hidden">
-    <div class="card-scene">
-      <div id="card" class="card">
-        <div class="card-face card-front">
-          <div class="card-front-inner">
-            <div class="card-ornament">✿</div>
-            <p class="card-pre">З Днем Народження</p>
-            <h2 class="card-name">Іро!</h2>
-            <div class="card-sparkle-line"></div>
-            <p class="card-tap-hint">Натисни, щоб відкрити</p>
-          </div>
-        </div>
-        <div class="card-face card-back">
-          <div class="card-back-inner">
-            <h2 id="greeting-title" class="greeting-title"></h2>
-            <p id="greeting-body" class="greeting-body"></p>
-            <div id="photo-row" class="photo-row hidden"></div>
-            <p id="from-name" class="from-name"></p>
-            <button id="hug-btn" class="btn-secondary" type="button">Обійняти 🤍</button>
-          </div>
-        </div>
-      </div>
+  <!-- 2. Greeting -->
+  <section id="greeting" class="overlay scene hidden">
+    <div class="panel greeting-panel">
+      <h1 id="greeting-title" class="greeting-title"></h1>
+      <p id="greeting-body" class="greeting-body"></p>
+      <p id="from-name" class="from-name"></p>
+      <button id="next-btn" class="btn-primary" type="button">Далі</button>
     </div>
-    <p class="interaction-hint">✦ Рухай мишею — зірки летять ✦</p>
-  </main>
+  </section>
 
-  <!-- Final overlay -->
-  <div id="final" class="overlay hidden">
-    <div class="final-inner">
-      <p id="final-message" class="final-message"></p>
-      <button id="replay-btn" class="btn-ghost" type="button">Ще раз 🔄</button>
-    </div>
-  </div>
+  <!-- 3. Bouquet UI -->
+  <section id="bouquet-ui" class="ui-layer scene hidden">
+    <p class="scene-caption">Букет піонів для тебе</p>
+    <button id="take-btn" class="btn-primary take-btn hidden" type="button">Взяти</button>
+  </section>
+
+  <!-- 4. Wish / stars UI -->
+  <section id="wish-ui" class="ui-layer scene hidden">
+    <p id="wish-text" class="wish-text"></p>
+  </section>
 
   <script type="importmap">
   {
