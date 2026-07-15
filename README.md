@@ -1,29 +1,34 @@
 # Листівка для Іри 🎂
 
-Окремий репозиторій: інтерактивна 3D-привітальна листівка.
+Окремий репозиторій: інтерактивна 3D-привітальна листівка (сердечка, пелюстки, конфеті).
 
-> Музика **вимкнена** поки (`melodyEnabled: false` у `public/js/config.js`). Файл `music.js` залишено на потім.
+> Музика **вимкнена** (`melodyEnabled: false`). Увімкнути пізніше в `public/js/config.js`.
 
-**Дизайн і сценарій:** [DESIGN.md](./DESIGN.md)
+## Живий прев’ю (GitHub Pages)
 
-## Локальний перегляд
-
-```bash
-cd public
-python3 -m http.server 8765
-# http://localhost:8765
-```
+**https://doctoraleks50.github.io/birthday-ira/**
 
 ## Firebase Hosting
 
+У цій машині Firebase ще не залогінений. Один раз локально:
+
 ```bash
-npm install -g firebase-tools
+cd ~/Projects/birthday-ira
+./deploy.sh
+# або:
 firebase login
-# у .firebaserc — project ID
+firebase projects:create birthday-ira-2026 --display-name "Birthday Ira"   # якщо проєкту ще немає
+firebase use birthday-ira-2026
 firebase deploy --only hosting
 ```
 
-Custom domain: Firebase Console → Hosting → Add custom domain → `birthday.ira.2026`
+Потім Custom domain у Console: `birthday.ira.2026`
+
+## Локально
+
+```bash
+cd public && python3 -m http.server 8765
+```
 
 ## Персоналізація
 
