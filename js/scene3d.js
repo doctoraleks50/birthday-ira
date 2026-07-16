@@ -290,7 +290,7 @@ export class Experience3D {
       }
     });
 
-    // Balloons gentle float
+    // Balloons gentle float + string sway
     if (this.balloons) {
       const dummy = new THREE.Object3D();
       for (let i = 0; i < this._balloonData.length; i++) {
@@ -302,6 +302,16 @@ export class Experience3D {
         dummy.scale.setScalar(d.s);
         dummy.updateMatrix();
         this.balloons.setMatrixAt(i, dummy.matrix);
+        const str = this._balloonStrings?.[i];
+        if (str) {
+          const base = new THREE.Vector3(x, y - d.s * 0.7, d.z);
+          const cp = base.clone().add(new THREE.Vector3(0.25 * Math.sin(t * 0.7 + d.phase), -0.7, 0.12 * Math.cos(t * 0.6 + d.phase)));
+          const end = base.clone().add(new THREE.Vector3(-0.18 * Math.cos(t * 0.5 + d.phase), -1.4, -0.08));
+          const curve = new THREE.QuadraticBezierCurve3(base, cp, end);
+          const newGeo = new THREE.TubeGeometry(curve, 20, 0.02, 6, false);
+          str.geometry.dispose();
+          str.geometry = newGeo;
+        }
       }
       this.balloons.instanceMatrix.needsUpdate = true;
     }
@@ -352,11 +362,32 @@ export class Experience3D {
   }
 
   _buildBalloons() {
-    const balloonGeo = new THREE.SphereGeometry(0.55, 22, 18);
-    const mat = new THREE.MeshPhysicalMaterial({ roughness: 0.2, metalness: 0.0, clearcoat: 0.6, transmission: 0.04, transparent: true, opacity: 0.95 });
+    // Tear-drop profile lathe for more cinematic balloons
+    const profile = [];
+    const r = 0.6;
+    for (let i = 0; i <= 20; i++) {
+      const t = i / 20;
+      const y = -r + t * (2 * r);
+      const rr = Math.sqrt(Math.max(0, 1 - Math.pow((y + 0.15) / (r + 0.15), 2)));
+      profile.push(new THREE.Vector2(rr * r, y));
+    }
+    const balloonGeo = new THREE.LatheGeometry(profile, 32);
+    const mat = new THREE.MeshPhysicalMaterial({
+      roughness: 0.1,
+      metalness: 0.02,
+      clearcoat: 0.9,
+      clearcoatRoughness: 0.2,
+      iridescence: 0.08,
+      transmission: 0.06,
+      reflectivity: 0.25,
+      thickness: 0.08,
+      transparent: true,
+      opacity: 0.96,
+    });
     const count = 10;
     this.balloons = new THREE.InstancedMesh(balloonGeo, mat, count);
     this._balloonData = [];
+    this._balloonStrings = [];
     const colors = [0xff8fab, 0xffd166, 0x90e0ef, 0xb8f2e6, 0xfed9b7, 0xf4acb7];
     for (let i = 0; i < count; i++) {
       const d = {
@@ -368,6 +399,19 @@ export class Experience3D {
       };
       this._balloonData.push(d);
       this.balloons.setColorAt(i, new THREE.Color(colors[i % colors.length]));
+      // Create string as Tube along quadratic bezier
+      const base = new THREE.Vector3(d.x, d.y - d.s * 0.7, d.z);
+      const cp = base.clone().add(new THREE.Vector3(0.2 * Math.sin(d.phase), -0.6, 0.1));
+      const end = base.clone().add(new THREE.Vector3(-0.15 * Math.cos(d.phase), -1.3, -0.05));
+      const curve = new THREE.QuadraticBezierCurve3(base, cp, end);
+      const tube = new THREE.TubeGeometry(curve, 20, 0.02, 6, false);
+      const string = new THREE.Mesh(
+        tube,
+        new THREE.MeshStandardMaterial({ color: 0xd7bde2, roughness: 0.6, metalness: 0.05 })
+      );
+      string.userData = { base, phase: d.phase };
+      this.scene.add(string);
+      this._balloonStrings.push(string);
     }
     this.scene.add(this.balloons);
   }
