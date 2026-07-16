@@ -197,8 +197,15 @@ export function createBouquet() {
     wrap.add(flower);
   }
 
-  // Paper wrap cone
-  const paperGeo = new THREE.ConeGeometry(0.95, 1.6, 24, 1, true);
+  // Paper wrap — smoother lathe rather than simple cone
+  const wrapProfile = [];
+  for (let i = 0; i <= 16; i++) {
+    const t = i / 16;
+    const y = -1.9 + t * 2.1;
+    const radius = 0.2 + Math.pow(t, 0.7) * 0.9 + (1 - t) * 0.05;
+    wrapProfile.push(new THREE.Vector2(radius, y));
+  }
+  const paperGeo = new THREE.LatheGeometry(wrapProfile, 28);
   const paperMat = new THREE.MeshStandardMaterial({
     color: 0xf5e6d3,
     side: THREE.DoubleSide,
@@ -207,7 +214,7 @@ export function createBouquet() {
     opacity: 0.92,
   });
   const paper = new THREE.Mesh(paperGeo, paperMat);
-  paper.position.y = -1.85;
+  paper.position.y = -0.2;
   paper.rotation.x = Math.PI;
   wrap.add(paper);
 
