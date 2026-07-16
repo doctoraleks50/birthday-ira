@@ -106,20 +106,20 @@ export class Experience3D {
       this.scene.remove(this.bouquet);
     }
     this.bouquet = createBouquet();
-    this.bouquet.position.set(0, -0.2, 0);
-    this.bouquet.rotation.y = 0.25;
+    this.bouquet.position.set(0, -0.55, 0);
+    this.bouquet.rotation.y = 0.2;
     this.scene.add(this.bouquet);
 
     this._buildBalloons();
     this._buildConfetti();
 
-    // Start far
-    this.camera.position.set(0.2, 0.6, 28);
-    this.camera.lookAt(0, 0.2, 0);
+    // Start far — end close enough to fill frame with bouquet + balloons above
+    this.camera.position.set(0.3, 1.2, 26);
+    this.camera.lookAt(0, 0.6, 0);
     this._camFrom = this.camera.position.clone();
-    this._camTo = new THREE.Vector3(0.15, 0.35, 4.2);
+    this._camTo = new THREE.Vector3(0.1, 0.9, 5.4);
     this._approachT = 0;
-    this._approachDur = 7.5; // seconds
+    this._approachDur = 7.2;
   }
 
   takeBouquet() {
@@ -140,8 +140,7 @@ export class Experience3D {
       this.scene.remove(this.bouquet);
       this.bouquet = null;
     }
-    if (this.balloons) { this.scene.remove(this.balloons); this.balloons = null; }
-    if (this.confetti) { this.scene.remove(this.confetti); this.confetti = null; }
+    this._clearPartyFx();
     if (this._bgMesh) {
       this.scene.remove(this._bgMesh);
       this._bgMesh = null;
@@ -290,30 +289,21 @@ export class Experience3D {
       }
     });
 
-    // Balloons gentle float + string sway
-    if (this.balloons) {
-      const dummy = new THREE.Object3D();
-      for (let i = 0; i < this._balloonData.length; i++) {
-        const d = this._balloonData[i];
-        const y = d.y + Math.sin(t * 0.5 + d.phase) * 0.4;
-        const x = d.x + Math.sin(t * 0.3 + d.phase) * 0.25;
-        dummy.position.set(x, y, d.z);
-        dummy.rotation.set(0.1 * Math.sin(t + d.phase), 0.2 * Math.sin(t * 0.7 + d.phase), 0);
-        dummy.scale.setScalar(d.s);
-        dummy.updateMatrix();
-        this.balloons.setMatrixAt(i, dummy.matrix);
-        const str = this._balloonStrings?.[i];
-        if (str) {
-          const base = new THREE.Vector3(x, y - d.s * 0.7, d.z);
-          const cp = base.clone().add(new THREE.Vector3(0.25 * Math.sin(t * 0.7 + d.phase), -0.7, 0.12 * Math.cos(t * 0.6 + d.phase)));
-          const end = base.clone().add(new THREE.Vector3(-0.18 * Math.cos(t * 0.5 + d.phase), -1.4, -0.08));
-          const curve = new THREE.QuadraticBezierCurve3(base, cp, end);
-          const newGeo = new THREE.TubeGeometry(curve, 20, 0.02, 6, false);
-          str.geometry.dispose();
-          str.geometry = newGeo;
+    // Helium balloons float gently (strings are children — move with balloon)
+    if (this.balloonGroup) {
+      for (const b of this.balloonGroup.children) {
+        const d = b.userData;
+        b.position.x = d.baseX + Math.sin(t * 0.35 + d.phase) * 0.22;
+        b.position.y = d.baseY + Math.sin(t * 0.45 + d.phase * 1.3) * 0.28;
+        b.position.z = d.baseZ;
+        b.rotation.z = Math.sin(t * 0.4 + d.phase) * 0.08;
+        b.rotation.x = Math.sin(t * 0.3 + d.phase) * 0.05;
+        // string tip sway
+        if (d.stringTip) {
+          d.stringTip.position.x = Math.sin(t * 0.9 + d.phase) * 0.08;
+          d.stringTip.position.z = Math.cos(t * 0.7 + d.phase) * 0.06;
         }
       }
-      this.balloons.instanceMatrix.needsUpdate = true;
     }
 
     // Confetti slow drift
@@ -323,7 +313,7 @@ export class Experience3D {
         const d = this._confettiData[i];
         d.y += d.vy * dt;
         d.x += d.vx * dt;
-        if (d.y < -8) { d.y = 8; d.x = (Math.random() - 0.5) * 12; }
+        if (d.y < -4) { d.y = 7; d.x = (Math.random() - 0.5) * 10; }
         dummy.position.set(d.x, d.y, d.z);
         dummy.rotation.set(d.rx += d.rsx * dt, d.ry += d.rsy * dt, d.rz += d.rsz * dt);
         dummy.scale.set(d.s, d.s * 0.5, 1);
@@ -338,7 +328,7 @@ export class Experience3D {
       const k = Math.min(1, this._approachT / this._approachDur);
       const e = easeOutCubic(k);
       this.camera.position.lerpVectors(this._camFrom, this._camTo, e);
-      this.camera.lookAt(0, 0.15, 0);
+      this.camera.lookAt(0, 0.4, 0);
 
       if (k >= 1 && !this._takeReady) {
         this._takeReady = true;
@@ -361,59 +351,137 @@ export class Experience3D {
     }
   }
 
+  _clearPartyFx() {
+    if (this.balloonGroup) {
+      this.scene.remove(this.balloonGroup);
+      this.balloonGroup.traverse((o) => {
+        o.geometry?.dispose?.();
+        if (o.material) {
+          if (Array.isArray(o.material)) o.material.forEach((m) => m.dispose());
+          else o.material.dispose?.();
+        }
+      });
+      this.balloonGroup = null;
+    }
+    if (this.balloons) {
+      this.scene.remove(this.balloons);
+      this.balloons = null;
+    }
+    if (this._balloonStrings) {
+      for (const s of this._balloonStrings) this.scene.remove(s);
+      this._balloonStrings = null;
+    }
+    if (this.confetti) {
+      this.scene.remove(this.confetti);
+      this.confetti = null;
+    }
+  }
+
+  /** Helium party balloons — metallic, float ABOVE bouquet, strings hang down (not clipped) */
   _buildBalloons() {
-    // Tear-drop profile lathe for more cinematic balloons
+    this._clearPartyFx();
+    this.balloonGroup = new THREE.Group();
+    this.scene.add(this.balloonGroup);
+
+    // Classic helium teardrop profile (round top, nip at bottom)
     const profile = [];
-    const r = 0.6;
-    for (let i = 0; i <= 20; i++) {
-      const t = i / 20;
-      const y = -r + t * (2 * r);
-      const rr = Math.sqrt(Math.max(0, 1 - Math.pow((y + 0.15) / (r + 0.15), 2)));
-      profile.push(new THREE.Vector2(rr * r, y));
+    for (let i = 0; i <= 28; i++) {
+      const t = i / 28;
+      // y from +0.55 (top) to -0.65 (nipple)
+      const y = 0.55 - t * 1.2;
+      let rr;
+      if (t < 0.82) {
+        // sphere-ish body
+        const ny = (y - 0.05) / 0.55;
+        rr = Math.sqrt(Math.max(0, 1 - ny * ny)) * 0.52;
+      } else {
+        // taper to tied nipple
+        const u = (t - 0.82) / 0.18;
+        rr = 0.12 * (1 - u) + 0.03 * u;
+      }
+      profile.push(new THREE.Vector2(Math.max(0.01, rr), y));
     }
-    const balloonGeo = new THREE.LatheGeometry(profile, 32);
-    const mat = new THREE.MeshPhysicalMaterial({
-      roughness: 0.1,
-      metalness: 0.02,
-      clearcoat: 0.9,
-      clearcoatRoughness: 0.2,
-      iridescence: 0.08,
-      transmission: 0.06,
-      reflectivity: 0.25,
-      thickness: 0.08,
-      transparent: true,
-      opacity: 0.96,
-    });
-    const count = 10;
-    this.balloons = new THREE.InstancedMesh(balloonGeo, mat, count);
-    this._balloonData = [];
-    this._balloonStrings = [];
-    const colors = [0xff8fab, 0xffd166, 0x90e0ef, 0xb8f2e6, 0xfed9b7, 0xf4acb7];
-    for (let i = 0; i < count; i++) {
-      const d = {
-        x: (Math.random() - 0.5) * 10,
-        y: Math.random() * 6 + 1.5,
-        z: -1 - Math.random() * 3,
-        s: 0.9 + Math.random() * 0.5,
-        phase: Math.random() * Math.PI * 2,
-      };
-      this._balloonData.push(d);
-      this.balloons.setColorAt(i, new THREE.Color(colors[i % colors.length]));
-      // Create string as Tube along quadratic bezier
-      const base = new THREE.Vector3(d.x, d.y - d.s * 0.7, d.z);
-      const cp = base.clone().add(new THREE.Vector3(0.2 * Math.sin(d.phase), -0.6, 0.1));
-      const end = base.clone().add(new THREE.Vector3(-0.15 * Math.cos(d.phase), -1.3, -0.05));
-      const curve = new THREE.QuadraticBezierCurve3(base, cp, end);
-      const tube = new THREE.TubeGeometry(curve, 20, 0.02, 6, false);
-      const string = new THREE.Mesh(
-        tube,
-        new THREE.MeshStandardMaterial({ color: 0xd7bde2, roughness: 0.6, metalness: 0.05 })
+    const balloonGeo = new THREE.LatheGeometry(profile, 40);
+    balloonGeo.computeVertexNormals();
+
+    // Metallic foil / chrome party balloons (like Sketchfab pick)
+    const colors = [
+      0xff4d8d, // hot pink
+      0xffd700, // gold
+      0x7ec8ff, // sky
+      0xff6b9d, // rose
+      0xc0c0c0, // silver
+      0xb388ff, // lilac
+      0xff8fab, // blush
+      0x80deea, // aqua
+    ];
+
+    // Place HIGH around frame sides so full balloon + string stay in view
+    const slots = [
+      { x: -2.4, y: 2.8, z: -0.5, s: 1.05 },
+      { x: 2.5, y: 3.0, z: -0.3, s: 1.1 },
+      { x: -1.6, y: 3.6, z: -1.2, s: 0.95 },
+      { x: 1.7, y: 3.8, z: -1.0, s: 1.0 },
+      { x: -3.0, y: 2.2, z: 0.4, s: 0.9 },
+      { x: 3.1, y: 2.4, z: 0.3, s: 0.92 },
+      { x: -0.8, y: 4.0, z: -1.6, s: 0.85 },
+      { x: 0.9, y: 4.2, z: -1.5, s: 0.88 },
+    ];
+
+    slots.forEach((slot, i) => {
+      const g = new THREE.Group();
+      const mat = new THREE.MeshPhysicalMaterial({
+        color: colors[i % colors.length],
+        roughness: 0.12,
+        metalness: 0.85,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.1,
+        reflectivity: 0.9,
+        iridescence: 0.25,
+        iridescenceIOR: 1.3,
+      });
+      const body = new THREE.Mesh(balloonGeo, mat);
+      body.castShadow = true;
+      g.add(body);
+
+      // Tied knot / nipple highlight
+      const knot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.045, 10, 8),
+        new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5, metalness: 0.3 })
       );
-      string.userData = { base, phase: d.phase };
-      this.scene.add(string);
-      this._balloonStrings.push(string);
-    }
-    this.scene.add(this.balloons);
+      knot.position.y = -0.68;
+      g.add(knot);
+
+      // Ribbon string hanging DOWN (child of balloon so it never clips separately)
+      const stringLen = 1.6 + Math.random() * 0.5;
+      const stringCurve = new THREE.CubicBezierCurve3(
+        new THREE.Vector3(0, -0.7, 0),
+        new THREE.Vector3(0.05, -0.7 - stringLen * 0.35, 0.02),
+        new THREE.Vector3(-0.08, -0.7 - stringLen * 0.7, -0.02),
+        new THREE.Vector3(0.02, -0.7 - stringLen, 0)
+      );
+      const string = new THREE.Mesh(
+        new THREE.TubeGeometry(stringCurve, 24, 0.012, 5, false),
+        new THREE.MeshStandardMaterial({ color: 0xf5e6ff, roughness: 0.55, metalness: 0.1 })
+      );
+      g.add(string);
+
+      // Tip marker for sway
+      const tip = new THREE.Object3D();
+      tip.position.set(0, -0.7 - stringLen, 0);
+      g.add(tip);
+
+      g.position.set(slot.x, slot.y, slot.z);
+      g.scale.setScalar(slot.s);
+      g.userData = {
+        baseX: slot.x,
+        baseY: slot.y,
+        baseZ: slot.z,
+        phase: Math.random() * Math.PI * 2,
+        stringTip: tip,
+      };
+      this.balloonGroup.add(g);
+    });
   }
 
   _buildConfetti() {
