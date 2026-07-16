@@ -7,21 +7,25 @@ const $ = (sel) => document.querySelector(sel);
 const exp = new Experience3D($("#scene3d"));
 exp.start();
 
-function typewriter(el, text, speed = 22) {
-  el.textContent = "";
-  el.classList.add("typing");
-  let i = 0;
+// Smooth word-by-word reveal with subtle rise and blur fade
+function revealParagraph(el, text, wordDelay = 60) {
+  el.innerHTML = "";
+  const words = text.split(/(\\s+)/);
+  words.forEach((w, i) => {
+    const span = document.createElement("span");
+    span.textContent = w;
+    span.style.setProperty("--i", String(i));
+    span.className = "reveal-word";
+    el.appendChild(span);
+  });
+  // force reflow, then add active
+  // eslint-disable-next-line no-unused-expressions
+  el.offsetHeight;
+  el.classList.add("reveal-on");
+  // resolve when last word animated
   return new Promise((resolve) => {
-    const tick = () => {
-      if (i < text.length) {
-        el.textContent += text[i++];
-        setTimeout(tick, speed);
-      } else {
-        el.classList.remove("typing");
-        resolve();
-      }
-    };
-    tick();
+    const total = words.length;
+    setTimeout(resolve, total * wordDelay + 400);
   });
 }
 
@@ -42,7 +46,7 @@ async function openGreeting() {
   $("#from-name").textContent = CONFIG.fromName;
   $("#next-btn").classList.add("hidden");
 
-  await typewriter($("#greeting-body"), CONFIG.greetingBody, 18);
+  await revealParagraph($("#greeting-body"), CONFIG.greetingBody, 60);
   $("#next-btn").classList.remove("hidden");
 }
 

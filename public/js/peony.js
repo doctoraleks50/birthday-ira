@@ -1,20 +1,20 @@
 import * as THREE from "three";
 
 /** Soft peony petal — curved surface as ExtrudeGeometry from organic shape */
-function createPetalGeometry(width = 1, length = 1.4, curl = 0.35) {
+function createPetalGeometry(width = 1, length = 1.4, curl = 0.5) {
   const shape = new THREE.Shape();
   shape.moveTo(0, 0);
-  shape.bezierCurveTo(width * 0.55, length * 0.15, width * 0.65, length * 0.55, width * 0.15, length);
-  shape.bezierCurveTo(0, length * 1.05, 0, length * 1.05, -width * 0.15, length);
-  shape.bezierCurveTo(-width * 0.65, length * 0.55, -width * 0.55, length * 0.15, 0, 0);
+  shape.bezierCurveTo(width * 0.6, length * 0.1, width * 0.8, length * 0.5, width * 0.2, length * 0.98);
+  shape.bezierCurveTo(0, length * 1.1, 0, length * 1.1, -width * 0.2, length * 0.98);
+  shape.bezierCurveTo(-width * 0.8, length * 0.5, -width * 0.6, length * 0.1, 0, 0);
 
   const geo = new THREE.ExtrudeGeometry(shape, {
-    depth: 0.018,
+    depth: 0.02,
     bevelEnabled: true,
-    bevelThickness: 0.012,
-    bevelSize: 0.02,
-    bevelSegments: 2,
-    curveSegments: 12,
+    bevelThickness: 0.014,
+    bevelSize: 0.026,
+    bevelSegments: 3,
+    curveSegments: 24,
   });
 
   // Curl petal tip toward center / outward
@@ -24,8 +24,9 @@ function createPetalGeometry(width = 1, length = 1.4, curl = 0.35) {
     v.fromBufferAttribute(pos, i);
     const t = Math.max(0, v.y / length);
     const fold = Math.sin(t * Math.PI) * curl;
-    v.z += fold * (0.4 + t * 0.8);
-    v.x *= 1 - t * 0.08;
+    v.z += fold * (0.45 + t * 0.9);
+    // taper to a round tip
+    v.x *= 1 - t * 0.12;
     pos.setXYZ(i, v.x, v.y, v.z);
   }
   pos.needsUpdate = true;
@@ -81,11 +82,11 @@ export function createPeony({
 
   // Layers: outer → inner
   const layers = [
-    { count: 10, radius: 0.42, tilt: 1.05, len: 1.35, w: 0.85, curl: 0.45, y: -0.05 },
-    { count: 9, radius: 0.32, tilt: 0.85, len: 1.2, w: 0.75, curl: 0.4, y: 0.02 },
-    { count: 8, radius: 0.22, tilt: 0.55, len: 1.05, w: 0.65, curl: 0.35, y: 0.08 },
-    { count: 7, radius: 0.12, tilt: 0.28, len: 0.85, w: 0.5, curl: 0.25, y: 0.14 },
-    { count: 6, radius: 0.04, tilt: 0.08, len: 0.55, w: 0.35, curl: 0.15, y: 0.18 },
+    { count: 12, radius: 0.46, tilt: 1.15, len: 1.45, w: 0.9,  curl: 0.55, y: -0.06 },
+    { count: 11, radius: 0.36, tilt: 0.95, len: 1.25, w: 0.78, curl: 0.5,  y: 0.01 },
+    { count: 10, radius: 0.26, tilt: 0.65, len: 1.08, w: 0.66, curl: 0.4,  y: 0.08 },
+    { count: 9,  radius: 0.16, tilt: 0.35, len: 0.9,  w: 0.52, curl: 0.3,  y: 0.14 },
+    { count: 7,  radius: 0.06, tilt: 0.12, len: 0.62, w: 0.38, curl: 0.22, y: 0.2  },
   ];
 
   layers.forEach((layer, li) => {
@@ -117,7 +118,7 @@ export function createPeony({
 
   // Center (anthers / core)
   const core = new THREE.Mesh(
-    new THREE.SphereGeometry(0.12, 16, 12),
+    new THREE.SphereGeometry(0.14, 24, 18),
     new THREE.MeshStandardMaterial({ color: 0xffe08a, roughness: 0.45, emissive: 0x332200, emissiveIntensity: 0.15 })
   );
   core.position.y = 0.2;

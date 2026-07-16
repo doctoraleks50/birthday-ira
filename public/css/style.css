@@ -129,7 +129,7 @@ html, body {
 
 .greeting-body {
   font-size: clamp(1.05rem, 3.2vw, 1.22rem);
-  line-height: 1.65;
+  line-height: 1.7;
   white-space: pre-line;
   color: var(--text);
   min-height: 4em;
@@ -142,12 +142,20 @@ html, body {
   color: var(--pink);
 }
 
-.typing::after {
-  content: "|";
-  color: var(--gold);
-  animation: blink 0.8s step-end infinite;
+/* Smooth word-by-word reveal */
+.reveal-word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(6px);
+  filter: blur(4px);
+  transition: opacity 480ms ease, transform 480ms ease, filter 600ms ease;
+  transition-delay: calc(var(--i) * 60ms);
 }
-@keyframes blink { 50% { opacity: 0; } }
+.reveal-on .reveal-word {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
 
 .btn-primary {
   margin-top: 1.6rem;

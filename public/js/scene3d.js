@@ -31,6 +31,8 @@ export class Experience3D {
     this.bouquet = null;
     this.stars = null;
     this.shooting = [];
+    this.balloons = null;
+    this.confetti = null;
 
     this._onResize = () => this._resize();
     window.addEventListener("resize", this._onResize);
@@ -108,6 +110,9 @@ export class Experience3D {
     this.bouquet.rotation.y = 0.25;
     this.scene.add(this.bouquet);
 
+    this._buildBalloons();
+    this._buildConfetti();
+
     // Start far
     this.camera.position.set(0.2, 0.6, 28);
     this.camera.lookAt(0, 0.2, 0);
@@ -135,6 +140,8 @@ export class Experience3D {
       this.scene.remove(this.bouquet);
       this.bouquet = null;
     }
+    if (this.balloons) { this.scene.remove(this.balloons); this.balloons = null; }
+    if (this.confetti) { this.scene.remove(this.confetti); this.confetti = null; }
     if (this._bgMesh) {
       this.scene.remove(this._bgMesh);
       this._bgMesh = null;
@@ -283,6 +290,39 @@ export class Experience3D {
       }
     });
 
+    // Balloons gentle float
+    if (this.balloons) {
+      const dummy = new THREE.Object3D();
+      for (let i = 0; i < this._balloonData.length; i++) {
+        const d = this._balloonData[i];
+        const y = d.y + Math.sin(t * 0.5 + d.phase) * 0.4;
+        const x = d.x + Math.sin(t * 0.3 + d.phase) * 0.25;
+        dummy.position.set(x, y, d.z);
+        dummy.rotation.set(0.1 * Math.sin(t + d.phase), 0.2 * Math.sin(t * 0.7 + d.phase), 0);
+        dummy.scale.setScalar(d.s);
+        dummy.updateMatrix();
+        this.balloons.setMatrixAt(i, dummy.matrix);
+      }
+      this.balloons.instanceMatrix.needsUpdate = true;
+    }
+
+    // Confetti slow drift
+    if (this.confetti) {
+      const dummy = new THREE.Object3D();
+      for (let i = 0; i < this._confettiData.length; i++) {
+        const d = this._confettiData[i];
+        d.y += d.vy * dt;
+        d.x += d.vx * dt;
+        if (d.y < -8) { d.y = 8; d.x = (Math.random() - 0.5) * 12; }
+        dummy.position.set(d.x, d.y, d.z);
+        dummy.rotation.set(d.rx += d.rsx * dt, d.ry += d.rsy * dt, d.rz += d.rsz * dt);
+        dummy.scale.set(d.s, d.s * 0.5, 1);
+        dummy.updateMatrix();
+        this.confetti.setMatrixAt(i, dummy.matrix);
+      }
+      this.confetti.instanceMatrix.needsUpdate = true;
+    }
+
     if (this.mode === "bouquet") {
       this._approachT += dt;
       const k = Math.min(1, this._approachT / this._approachDur);
@@ -309,6 +349,62 @@ export class Experience3D {
         this.onBouquetGone?.();
       }
     }
+  }
+
+  _buildBalloons() {
+    const balloonGeo = new THREE.SphereGeometry(0.55, 22, 18);
+    const mat = new THREE.MeshPhysicalMaterial({ roughness: 0.2, metalness: 0.0, clearcoat: 0.6, transmission: 0.04, transparent: true, opacity: 0.95 });
+    const count = 10;
+    this.balloons = new THREE.InstancedMesh(balloonGeo, mat, count);
+    this._balloonData = [];
+    const colors = [0xff8fab, 0xffd166, 0x90e0ef, 0xb8f2e6, 0xfed9b7, 0xf4acb7];
+    for (let i = 0; i < count; i++) {
+      const d = {
+        x: (Math.random() - 0.5) * 10,
+        y: Math.random() * 6 + 1.5,
+        z: -1 - Math.random() * 3,
+        s: 0.9 + Math.random() * 0.5,
+        phase: Math.random() * Math.PI * 2,
+      };
+      this._balloonData.push(d);
+      this.balloons.setColorAt(i, new THREE.Color(colors[i % colors.length]));
+    }
+    this.scene.add(this.balloons);
+  }
+
+  _buildConfetti() {
+    const geo = new THREE.PlaneGeometry(0.2, 0.4);
+    const mat = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, metalness: 0.3, roughness: 0.4 });
+    const count = 160;
+    this.confetti = new THREE.InstancedMesh(geo, mat, count);
+    this._confettiData = [];
+    const colors = [0xffd166, 0xc9184a, 0xff8fab, 0x4cc9f0, 0xffffff, 0x80ed99];
+    const dummy = new THREE.Object3D();
+    for (let i = 0; i < count; i++) {
+      const d = {
+        x: (Math.random() - 0.5) * 12,
+        y: (Math.random() - 0.5) * 10,
+        z: -1 - Math.random() * 2,
+        vx: (Math.random() - 0.5) * 0.2,
+        vy: -0.2 - Math.random() * 0.2,
+        rx: Math.random() * Math.PI,
+        ry: Math.random() * Math.PI,
+        rz: Math.random() * Math.PI,
+        rsx: (Math.random() - 0.5) * 2,
+        rsy: (Math.random() - 0.5) * 2,
+        rsz: (Math.random() - 0.5) * 2,
+        s: 0.6 + Math.random() * 1.2,
+      };
+      this._confettiData.push(d);
+      dummy.position.set(d.x, d.y, d.z);
+      dummy.rotation.set(d.rx, d.ry, d.rz);
+      dummy.scale.set(d.s, d.s * 0.5, 1);
+      dummy.updateMatrix();
+      this.confetti.setMatrixAt(i, dummy.matrix);
+      this.confetti.setColorAt(i, new THREE.Color(colors[i % colors.length]));
+    }
+    this.confetti.instanceColor.needsUpdate = true;
+    this.scene.add(this.confetti);
   }
 
   _tickStars(dt, t) {
