@@ -205,27 +205,40 @@ export function createPeony({
   return group;
 }
 
-function createLeaf(w, len, seed) {
-  const shape = new THREE.Shape();
-  shape.moveTo(0, 0);
-  shape.bezierCurveTo(w, len * 0.25, w * 1.05, len * 0.55, 0.05, len);
-  shape.bezierCurveTo(-w * 1.05, len * 0.55, -w, len * 0.25, 0, 0);
-  const geo = new THREE.ShapeGeometry(shape, 12);
-  const pos = geo.attributes.position;
-  const v = new THREE.Vector3();
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i);
-    const t = v.y / len;
-    v.z = Math.sin(t * Math.PI) * 0.04;
-    pos.setXYZ(i, v.x, v.y, v.z);
+function createLeaf(w, len, _seed) {
+  // Smooth parametric leaf (same approach as petals)
+  const segsU = 12;
+  const segsV = 16;
+  const positions = [];
+  const indices = [];
+  for (let j = 0; j <= segsV; j++) {
+    const v = j / segsV;
+    const y = v * len;
+    const half = w * Math.sin(v * Math.PI) * Math.pow(1 - v * 0.15, 0.5);
+    for (let i = 0; i <= segsU; i++) {
+      const u = i / segsU;
+      const x = (u * 2 - 1) * half;
+      const z = Math.sin(v * Math.PI) * 0.05 * (1 - Math.abs(u * 2 - 1) * 0.4);
+      positions.push(x, y, z);
+    }
   }
-  pos.needsUpdate = true;
+  for (let j = 0; j < segsV; j++) {
+    for (let i = 0; i < segsU; i++) {
+      const a = j * (segsU + 1) + i;
+      const b = a + segsU + 1;
+      indices.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.setIndex(indices);
   geo.computeVertexNormals();
   return new THREE.Mesh(
     geo,
     new THREE.MeshStandardMaterial({
       color: 0x1f5c32,
       roughness: 0.8,
+      flatShading: false,
       side: THREE.DoubleSide,
     })
   );

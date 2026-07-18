@@ -147,18 +147,19 @@ html, body {
   color: var(--pink);
 }
 
-/* Smooth word-by-word reveal */
+/* Smooth word-by-word reveal — words only; spaces are real text nodes */
+.greeting-body {
+  white-space: pre-line;
+}
 .reveal-word {
-  display: inline-block;
+  display: inline;
   opacity: 0;
-  transform: translateY(6px);
-  filter: blur(4px);
-  transition: opacity 480ms ease, transform 480ms ease, filter 600ms ease;
-  transition-delay: calc(var(--i) * 60ms);
+  filter: blur(3px);
+  transition: opacity 480ms ease, filter 600ms ease;
+  transition-delay: calc(var(--i) * 55ms);
 }
 .reveal-on .reveal-word {
   opacity: 1;
-  transform: translateY(0);
   filter: blur(0);
 }
 
@@ -253,38 +254,55 @@ html, body {
 }
 .scene-hint.fade-out { opacity: 0; }
 
+#finale.overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
 .finale-panel {
-  max-width: min(92vw, 480px);
+  width: min(92vw, 480px);
+  max-width: 92vw;
+  margin: 0 auto;
   text-align: center;
   padding: 1.5rem;
+  position: relative;
+  left: 0;
+  transform: none;
 }
 
 .finale-text {
-  position: static;
-  left: auto;
+  display: block;
+  position: relative;
+  left: 0;
   top: auto;
-  transform: none;
   width: 100%;
   max-width: 100%;
-  margin: 0 auto;
+  margin: 0;
+  padding: 0;
   text-align: center;
   font-family: var(--font-script);
-  font-size: clamp(1.8rem, 7vw, 2.8rem);
+  font-size: clamp(1.8rem, 7vw, 2.6rem);
   color: #ffe9c7;
   text-shadow:
     0 0 24px rgba(255, 209, 102, 0.35),
     0 4px 28px rgba(0, 0, 0, 0.65);
   opacity: 0;
-  animation: finaleIn 1.4s ease forwards;
   white-space: normal;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  line-height: 1.35;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  transform: none !important;
+}
+.finale-text.finale-in {
+  animation: finaleIn 1.2s ease forwards;
 }
 
 @keyframes finaleIn {
-  from { opacity: 0; transform: translateY(14px); letter-spacing: 0.08em; }
-  to   { opacity: 1; transform: translateY(0); letter-spacing: 0.02em; }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .candle-count {
