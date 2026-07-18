@@ -138,7 +138,7 @@ export class Experience3D {
     }
 
     this.bouquet = createBouquet();
-    this.bouquet.position.set(0, -0.25, 0);
+    this.bouquet.position.set(0, -0.2, 0);
     this.bouquet.rotation.y = 0.2;
     this._userRot = { x: -0.1, y: 0.25 };
     this.scene.add(this.bouquet);
@@ -150,7 +150,7 @@ export class Experience3D {
     this.camera.position.set(0.3, 1.2, 26);
     this.camera.lookAt(0, 0.6, 0);
     this._camFrom = this.camera.position.clone();
-    this._camTo = new THREE.Vector3(0.3, 1.05, 5.5);
+    this._camTo = new THREE.Vector3(0.2, 1.1, 6.2);
     this._approachT = 0;
     this._approachDur = 6.5;
   }
