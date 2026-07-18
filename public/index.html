@@ -20,7 +20,6 @@
       <div class="pulse-heart" aria-hidden="true"></div>
       <p class="whisper">Для тебе…</p>
       <button id="open-btn" class="btn-primary" type="button">Відкрити</button>
-      <a href="models-pick.html" style="display:block;margin-top:1rem;font-size:0.9rem;color:rgba(255,248,245,0.5);">Обрати 3D-моделі →</a>
     </div>
   </section>
 
@@ -43,6 +42,24 @@
   <!-- 4. Wish / stars UI -->
   <section id="wish-ui" class="ui-layer scene hidden">
     <p id="wish-text" class="wish-text"></p>
+    <button id="cake-btn" class="btn-primary take-btn hidden" type="button">До торта</button>
+  </section>
+
+  <!-- 5. Cake / blow UI -->
+  <section id="cake-ui" class="ui-layer scene hidden">
+    <p class="scene-caption" id="cake-caption">Задуй свічки — подуй у мікрофон</p>
+    <div id="blow-meter" class="blow-meter hidden" aria-hidden="true">
+      <div id="blow-fill" class="blow-fill"></div>
+    </div>
+    <p id="candle-count" class="candle-count"></p>
+    <button id="mic-btn" class="btn-primary take-btn" type="button">Увімкнути мікрофон</button>
+  </section>
+
+  <!-- 6. Finale -->
+  <section id="finale" class="overlay scene hidden">
+    <div class="panel">
+      <p id="finale-text" class="wish-text fade-in" style="position:static;transform:none;opacity:1;width:auto;"></p>
+    </div>
   </section>
 
   <script type="importmap">

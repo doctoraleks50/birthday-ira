@@ -1,13 +1,16 @@
 import * as THREE from "three";
 import { createBouquet } from "./peony.js";
+import { createCake } from "./cake.js";
 
 export class Experience3D {
   constructor(canvas) {
     this.canvas = canvas;
-    this.mode = "idle"; // idle | bouquet | stars
+    this.mode = "idle"; // idle | bouquet | stars | cake
     this.clock = new THREE.Clock();
     this._takeReady = false;
     this.onTakeReady = null;
+    this.onAllCandlesOut = null;
+    this.cake = null;
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -156,6 +159,56 @@ export class Experience3D {
     this._shootTimer = 0;
   }
 
+  /** Transition from stars → birthday cake with 30 candles */
+  startCake() {
+    this.mode = "cake";
+
+    // Clear starfield
+    if (this.stars) { this.scene.remove(this.stars); this.stars = null; }
+    if (this.milky) { this.scene.remove(this.milky); this.milky = null; }
+    for (const s of this.shooting) {
+      this.scene.remove(s.mesh);
+      s.mesh.geometry.dispose();
+      s.mesh.material.dispose();
+    }
+    this.shooting = [];
+
+    this.renderer.setClearColor(0x1a1024, 1);
+    this.scene.fog = new THREE.FogExp2(0x1a1024, 0.04);
+    this._key.intensity = 1.1;
+    this._rim.intensity = 0.6;
+    this._rim.color.set(0xffaa66);
+
+    if (this.cake) {
+      this.scene.remove(this.cake);
+      this.cake = null;
+    }
+    this.cake = createCake();
+    this.cake.position.set(0, -0.2, 0);
+    this.scene.add(this.cake);
+
+    this.camera.position.set(0.4, 1.6, 4.2);
+    this.camera.lookAt(0, 0.4, 0);
+    this._cakeCamBase = this.camera.position.clone();
+  }
+
+  /**
+   * Extinguish candles based on blow intensity 0..1
+   * Stronger blow → more candles per call
+   */
+  blowCandles(intensity) {
+    if (this.mode !== "cake" || !this.cake || intensity <= 0) return this.cake?.userData.litCount ?? 0;
+    // Map intensity → candles: soft=1, strong≈6–8
+    const n = Math.max(1, Math.round(intensity * 8));
+    const left = this.cake.extinguish(n);
+    if (left <= 0) this.onAllCandlesOut?.();
+    return left;
+  }
+
+  get litCandles() {
+    return this.cake?.userData.litCount ?? 0;
+  }
+
   _buildStarfield() {
     if (this.stars) this.scene.remove(this.stars);
 
@@ -268,9 +321,25 @@ export class Experience3D {
       this._tickBouquet(dt, t);
     } else if (this.mode === "stars") {
       this._tickStars(dt, t);
+    } else if (this.mode === "cake") {
+      this._tickCake(dt, t);
     }
 
     this.renderer.render(this.scene, this.camera);
+  }
+
+  _tickCake(dt, t) {
+    if (!this.cake) return;
+    this.cake.tick(t, dt);
+    const c = this.cake.userData.cake;
+    c.rotation.y = Math.sin(t * 0.25) * 0.08 + this._pointer.x * 0.12;
+    c.rotation.x = 0.05 + this._pointer.y * 0.04;
+    // Gentle camera drift
+    if (this._cakeCamBase) {
+      this.camera.position.x = this._cakeCamBase.x + Math.sin(t * 0.2) * 0.15;
+      this.camera.position.y = this._cakeCamBase.y + Math.cos(t * 0.18) * 0.08;
+      this.camera.lookAt(0, 0.4, 0);
+    }
   }
 
   _tickBouquet(dt, t) {

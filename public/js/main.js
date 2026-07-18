@@ -1,5 +1,6 @@
 import { CONFIG } from "./config.js";
 import { Experience3D } from "./scene3d.js";
+import { BlowDetector } from "./blow.js";
 
 document.title = CONFIG.siteTitle;
 const $ = (sel) => document.querySelector(sel);
@@ -7,10 +8,13 @@ const $ = (sel) => document.querySelector(sel);
 const exp = new Experience3D($("#scene3d"));
 exp.start();
 
-// Smooth word-by-word reveal with subtle rise and blur fade
+const blow = new BlowDetector();
+let blowLoop = null;
+let cakeDone = false;
+
 function revealParagraph(el, text, wordDelay = 60) {
   el.innerHTML = "";
-  const words = text.split(/(\\s+)/);
+  const words = text.split(/(\s+)/);
   words.forEach((w, i) => {
     const span = document.createElement("span");
     span.textContent = w;
@@ -18,23 +22,15 @@ function revealParagraph(el, text, wordDelay = 60) {
     span.className = "reveal-word";
     el.appendChild(span);
   });
-  // force reflow, then add active
-  // eslint-disable-next-line no-unused-expressions
   el.offsetHeight;
   el.classList.add("reveal-on");
-  // resolve when last word animated
   return new Promise((resolve) => {
-    const total = words.length;
-    setTimeout(resolve, total * wordDelay + 400);
+    setTimeout(resolve, words.length * wordDelay + 400);
   });
 }
 
-function show(el) {
-  el.classList.remove("hidden");
-}
-function hide(el) {
-  el.classList.add("hidden");
-}
+function show(el) { el.classList.remove("hidden"); }
+function hide(el) { el.classList.add("hidden"); }
 
 async function openGreeting() {
   const intro = $("#intro");
@@ -69,6 +65,12 @@ exp.onBouquetGone = () => {
   $("#wish-text").textContent = CONFIG.wishText;
   $("#wish-text").classList.add("fade-in");
   exp.startStars();
+  // Show "to cake" after wish sinks in
+  setTimeout(() => {
+    const btn = $("#cake-btn");
+    btn.classList.remove("hidden");
+    btn.classList.add("pop-in");
+  }, 3500);
 };
 
 function takeBouquet() {
@@ -77,6 +79,69 @@ function takeBouquet() {
   exp.takeBouquet();
 }
 
+function goCake() {
+  hide($("#wish-ui"));
+  show($("#cake-ui"));
+  $("#candle-count").textContent = "Свічок: 30";
+  exp.startCake();
+}
+
+async function enableMic() {
+  try {
+    await blow.start();
+    $("#mic-btn").classList.add("hidden");
+    $("#blow-meter").classList.remove("hidden");
+    $("#cake-caption").textContent = "Подуй у мікрофон — чим сильніше, тим більше свічок";
+    startBlowLoop();
+  } catch (err) {
+    $("#cake-caption").textContent = "Немає доступу до мікрофона. Дозволь у налаштуваннях браузера.";
+    console.warn(err);
+  }
+}
+
+function startBlowLoop() {
+  if (blowLoop) cancelAnimationFrame(blowLoop);
+  let accum = 0;
+  const tick = () => {
+    blowLoop = requestAnimationFrame(tick);
+    if (cakeDone) return;
+    const { intensity, isBlow } = blow.sample();
+    const fill = $("#blow-fill");
+    fill.style.width = `${Math.round(intensity * 100)}%`;
+    fill.classList.toggle("hot", intensity > 0.5);
+
+    if (isBlow && intensity > 0.08) {
+      accum += intensity;
+      // Extinguish in bursts so strong blows clear many at once
+      if (accum >= 0.35) {
+        const n = Math.min(1, accum);
+        const left = exp.blowCandles(n);
+        accum = 0;
+        $("#candle-count").textContent = `Свічок: ${left}`;
+      }
+    } else {
+      accum *= 0.85;
+    }
+  };
+  tick();
+}
+
+exp.onAllCandlesOut = () => {
+  if (cakeDone) return;
+  cakeDone = true;
+  blow.stop();
+  if (blowLoop) cancelAnimationFrame(blowLoop);
+  $("#cake-caption").textContent = "Усі свічки задуті";
+  $("#candle-count").textContent = "Свічок: 0";
+  setTimeout(() => {
+    hide($("#cake-ui"));
+    show($("#finale"));
+    $("#finale-text").textContent = CONFIG.finaleText;
+  }, 1200);
+};
+
 $("#open-btn").addEventListener("click", openGreeting);
 $("#next-btn").addEventListener("click", goBouquet);
 $("#take-btn").addEventListener("click", takeBouquet);
+$("#cake-btn").addEventListener("click", goCake);
+$("#mic-btn").addEventListener("click", enableMic);

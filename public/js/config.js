@@ -10,6 +10,7 @@ export const CONFIG = {
 Дякую, що ти є. Я тебе безмежно кохаю.`,
   fromName: "твій коханий",
   wishText: "Загадай бажання, поки падає зірка…",
+  finaleText: "Бажання загадане. З Днем Народження, кохана 🤍",
   melodyEnabled: false,
   siteTitle: "Для коханої",
 };

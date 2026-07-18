@@ -235,6 +235,43 @@ html, body {
   to   { opacity: 1; transform: translate(-50%, -50%); letter-spacing: 0.02em; }
 }
 
+.candle-count {
+  position: fixed;
+  top: 4.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  color: var(--gold);
+  text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  pointer-events: none;
+}
+
+.blow-meter {
+  position: fixed;
+  left: 50%;
+  bottom: 6.5rem;
+  transform: translateX(-50%);
+  width: min(70vw, 260px);
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.18);
+  overflow: hidden;
+  pointer-events: none;
+}
+.blow-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ffd166, #ff8fab);
+  transition: width 0.08s linear;
+}
+.blow-fill.hot {
+  background: linear-gradient(90deg, #ff8fab, #ff4d6d);
+  box-shadow: 0 0 12px rgba(255, 77, 109, 0.6);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
