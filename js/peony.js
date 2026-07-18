@@ -15,35 +15,46 @@ function mulberry32(a) {
 }
 
 /** Soft oval petal with ruffled tip — planar then bent into a cup */
-function createPetalGeometry(w = 0.55, h = 0.75, seed = 1) {
+function createPetalGeometry(w = 0.55, h = 0.75, seed = 1, highDetail = false) {
   const rng = mulberry32(seed);
   const shape = new THREE.Shape();
-  // Rounded base → wide middle → soft scalloped tip (not square)
+  // Wider, rounder silhouette — readable as a real peony petal up close
   shape.moveTo(0, 0);
-  shape.bezierCurveTo(w * 0.55, h * 0.08, w * 0.95, h * 0.35, w * 0.72, h * 0.72);
-  // scalloped tip
-  shape.quadraticCurveTo(w * 0.45, h * 1.02, 0, h * 0.98);
-  shape.quadraticCurveTo(-w * 0.45, h * 1.02, -w * 0.72, h * 0.72);
-  shape.bezierCurveTo(-w * 0.95, h * 0.35, -w * 0.55, h * 0.08, 0, 0);
+  shape.bezierCurveTo(w * 0.65, h * 0.06, w * 1.05, h * 0.38, w * 0.78, h * 0.7);
+  shape.bezierCurveTo(w * 0.55, h * 0.92, w * 0.28, h * 1.08, 0, h);
+  shape.bezierCurveTo(-w * 0.28, h * 1.08, -w * 0.55, h * 0.92, -w * 0.78, h * 0.7);
+  shape.bezierCurveTo(-w * 1.05, h * 0.38, -w * 0.65, h * 0.06, 0, 0);
 
-  const geo = new THREE.ShapeGeometry(shape, 28);
-  // Bend into cupped petal (sphere-ish volume)
+  const segments = highDetail ? 40 : 24;
+  let geo;
+  if (highDetail) {
+    geo = new THREE.ExtrudeGeometry(shape, {
+      depth: 0.012,
+      bevelEnabled: true,
+      bevelThickness: 0.008,
+      bevelSize: 0.014,
+      bevelSegments: 2,
+      curveSegments: segments,
+    });
+  } else {
+    geo = new THREE.ShapeGeometry(shape, segments);
+  }
+
   const pos = geo.attributes.position;
   const v = new THREE.Vector3();
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i);
     const t = Math.max(0, Math.min(1, v.y / h));
     const across = v.x / (w + 0.001);
-    // cup depth + tip curl + slight ruffle
-    const cup = Math.sin(t * Math.PI) * 0.22 + t * t * 0.18;
-    const ruffle = Math.sin(across * Math.PI * 3 + t * 6) * 0.02 * t;
-    const sideLift = across * across * 0.08 * t;
-    v.z = cup + ruffle + sideLift;
-    // soft tip taper
-    v.x *= 1 - t * 0.08;
-    // tiny organic jitter
-    v.x += (rng() - 0.5) * 0.01 * t;
-    v.y += (rng() - 0.5) * 0.008 * t;
+    const cup = Math.sin(t * Math.PI) * 0.28 + t * t * 0.22;
+    const ruffle = Math.sin(across * Math.PI * 4 + t * 7) * (highDetail ? 0.035 : 0.02) * t;
+    const sideLift = across * across * 0.1 * t;
+    v.z += cup + ruffle + sideLift;
+    v.x *= 1 - t * 0.1;
+    if (highDetail) {
+      v.x += (rng() - 0.5) * 0.012 * t;
+      v.y += (rng() - 0.5) * 0.01 * t;
+    }
     pos.setXYZ(i, v.x, v.y, v.z);
   }
   pos.needsUpdate = true;
@@ -71,22 +82,21 @@ function petalMat(hex, roughness = 0.62) {
 export function createPeony({
   scale = 1,
   seed = 1,
-  open = 0.85, // 0 bud … 1 full bloom
+  open = 0.85,
+  highDetail = false,
 } = {}) {
   const group = new THREE.Group();
   const rng = mulberry32(seed);
 
-  // Magenta / fuchsia like reference
   const palette = [
-    0xe91e8c, // deep
+    0xe91e8c,
     0xf43f9a,
     0xff5aad,
     0xff7ab8,
     0xff9ac8,
-    0xffb3d4, // outer lighter
+    0xffb3d4,
   ];
 
-  // Stem
   const stem = new THREE.Mesh(
     new THREE.CylinderGeometry(0.035, 0.05, 2.6, 10),
     new THREE.MeshStandardMaterial({ color: 0x2f6b3a, roughness: 0.9 })
@@ -94,7 +104,6 @@ export function createPeony({
   stem.position.y = -1.45;
   group.add(stem);
 
-  // Leaves (oval, dark green)
   for (let i = 0; i < 4; i++) {
     const leaf = createLeaf(0.28 + rng() * 0.12, 0.75 + rng() * 0.25, seed + i * 17);
     const side = i % 2 === 0 ? 1 : -1;
@@ -109,23 +118,32 @@ export function createPeony({
   bloom.position.y = 0.05;
   group.add(bloom);
 
-  // Many layers → dense sphere (like photo)
-  const layers = [
-    { count: 14, radius: 0.38 * open, tilt: 1.25, w: 0.52, h: 0.72, y: -0.08 },
-    { count: 13, radius: 0.32 * open, tilt: 1.05, w: 0.48, h: 0.68, y: -0.02 },
-    { count: 12, radius: 0.26 * open, tilt: 0.85, w: 0.44, h: 0.62, y: 0.04 },
-    { count: 11, radius: 0.2 * open, tilt: 0.65, w: 0.4, h: 0.55, y: 0.1 },
-    { count: 10, radius: 0.14 * open, tilt: 0.45, w: 0.34, h: 0.48, y: 0.15 },
-    { count: 9, radius: 0.09 * open, tilt: 0.28, w: 0.28, h: 0.4, y: 0.19 },
-    { count: 8, radius: 0.05 * open, tilt: 0.14, w: 0.22, h: 0.32, y: 0.22 },
-    { count: 7, radius: 0.02, tilt: 0.05, w: 0.16, h: 0.24, y: 0.24 },
-  ];
+  // Front-row blooms: more petals, slightly more open & readable silhouette
+  const layers = highDetail
+    ? [
+        { count: 16, radius: 0.48 * open, tilt: 1.15, w: 0.62, h: 0.82, y: -0.1 },
+        { count: 15, radius: 0.4 * open, tilt: 0.98, w: 0.56, h: 0.76, y: -0.03 },
+        { count: 14, radius: 0.32 * open, tilt: 0.78, w: 0.5, h: 0.68, y: 0.04 },
+        { count: 12, radius: 0.24 * open, tilt: 0.58, w: 0.44, h: 0.58, y: 0.1 },
+        { count: 11, radius: 0.16 * open, tilt: 0.38, w: 0.36, h: 0.5, y: 0.16 },
+        { count: 10, radius: 0.1 * open, tilt: 0.22, w: 0.28, h: 0.4, y: 0.2 },
+        { count: 8, radius: 0.05, tilt: 0.1, w: 0.2, h: 0.3, y: 0.24 },
+      ]
+    : [
+        { count: 14, radius: 0.38 * open, tilt: 1.25, w: 0.52, h: 0.72, y: -0.08 },
+        { count: 13, radius: 0.32 * open, tilt: 1.05, w: 0.48, h: 0.68, y: -0.02 },
+        { count: 12, radius: 0.26 * open, tilt: 0.85, w: 0.44, h: 0.62, y: 0.04 },
+        { count: 11, radius: 0.2 * open, tilt: 0.65, w: 0.4, h: 0.55, y: 0.1 },
+        { count: 10, radius: 0.14 * open, tilt: 0.45, w: 0.34, h: 0.48, y: 0.15 },
+        { count: 9, radius: 0.09 * open, tilt: 0.28, w: 0.28, h: 0.4, y: 0.19 },
+        { count: 8, radius: 0.05 * open, tilt: 0.14, w: 0.22, h: 0.32, y: 0.22 },
+        { count: 7, radius: 0.02, tilt: 0.05, w: 0.16, h: 0.24, y: 0.24 },
+      ];
 
   layers.forEach((layer, li) => {
-    const geo = createPetalGeometry(layer.w, layer.h, seed + li * 31);
+    const geo = createPetalGeometry(layer.w, layer.h, seed + li * 31, highDetail);
     const color = palette[Math.min(li, palette.length - 1)];
-    // outer layers lighter (catch light), inner deeper
-    const mat = petalMat(color, 0.55 + li * 0.03);
+    const mat = petalMat(color, 0.5 + li * 0.03);
     const offset = (rng() * Math.PI * 2) / layer.count;
 
     for (let i = 0; i < layer.count; i++) {
@@ -200,21 +218,26 @@ export function createBouquet() {
   const wrap = new THREE.Group();
   root.add(wrap);
 
-  // Tight cluster like reference (~9 heads)
+  // Front row (high z / facing camera) gets highDetail
   const placements = [
-    { x: 0.0, y: 0.15, z: 0.05, s: 1.0, seed: 11, open: 0.95, rx: -0.05, ry: 0.0 },
-    { x: 0.42, y: 0.05, z: 0.2, s: 0.92, seed: 22, open: 0.9, rx: -0.08, ry: 0.45 },
-    { x: -0.4, y: 0.08, z: 0.18, s: 0.94, seed: 33, open: 0.92, rx: -0.1, ry: -0.4 },
-    { x: 0.22, y: 0.28, z: -0.28, s: 0.88, seed: 44, open: 0.85, rx: 0.05, ry: 0.25 },
-    { x: -0.25, y: 0.25, z: -0.3, s: 0.9, seed: 55, open: 0.88, rx: 0.02, ry: -0.3 },
-    { x: 0.08, y: -0.12, z: 0.42, s: 0.86, seed: 66, open: 0.8, rx: -0.2, ry: 0.15 },
-    { x: -0.48, y: -0.15, z: -0.05, s: 0.84, seed: 77, open: 0.78, rx: -0.12, ry: -0.55 },
-    { x: 0.5, y: -0.1, z: -0.12, s: 0.82, seed: 88, open: 0.75, rx: -0.1, ry: 0.6 },
-    { x: -0.05, y: 0.35, z: 0.15, s: 0.8, seed: 99, open: 0.7, rx: 0.08, ry: 0.1 },
+    { x: 0.0, y: 0.12, z: 0.35, s: 1.12, seed: 11, open: 1.0, rx: -0.25, ry: 0.0, front: true },
+    { x: 0.48, y: 0.02, z: 0.38, s: 1.05, seed: 22, open: 0.98, rx: -0.28, ry: 0.35, front: true },
+    { x: -0.46, y: 0.04, z: 0.36, s: 1.06, seed: 33, open: 0.98, rx: -0.28, ry: -0.35, front: true },
+    { x: 0.22, y: 0.28, z: -0.22, s: 0.88, seed: 44, open: 0.85, rx: 0.05, ry: 0.25 },
+    { x: -0.25, y: 0.25, z: -0.25, s: 0.9, seed: 55, open: 0.88, rx: 0.02, ry: -0.3 },
+    { x: 0.08, y: -0.05, z: 0.55, s: 1.0, seed: 66, open: 0.95, rx: -0.35, ry: 0.1, front: true },
+    { x: -0.52, y: -0.08, z: 0.05, s: 0.84, seed: 77, open: 0.78, rx: -0.12, ry: -0.55 },
+    { x: 0.55, y: -0.06, z: 0.02, s: 0.82, seed: 88, open: 0.75, rx: -0.1, ry: 0.6 },
+    { x: -0.05, y: 0.38, z: 0.08, s: 0.8, seed: 99, open: 0.7, rx: 0.08, ry: 0.1 },
   ];
 
   for (const p of placements) {
-    const flower = createPeony({ scale: p.s, seed: p.seed, open: p.open });
+    const flower = createPeony({
+      scale: p.s,
+      seed: p.seed,
+      open: p.open,
+      highDetail: !!p.front,
+    });
     flower.position.set(p.x, p.y, p.z);
     flower.rotation.x = p.rx;
     flower.rotation.y = p.ry;
