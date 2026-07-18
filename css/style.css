@@ -148,9 +148,6 @@ html, body {
 }
 
 /* Smooth word-by-word reveal — words only; spaces are real text nodes */
-.greeting-body {
-  white-space: pre-line;
-}
 .reveal-word {
   display: inline;
   opacity: 0;
