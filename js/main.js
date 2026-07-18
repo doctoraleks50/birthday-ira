@@ -66,10 +66,6 @@ async function goBouquet() {
   $("#take-btn").classList.add("hidden");
   $("#bouquet-hint")?.classList.remove("hidden");
   await exp.startBouquetApproach();
-  if (exp.bouquet?.userData?.loadError) {
-    const cap = $("#bouquet-ui .scene-caption");
-    if (cap) cap.textContent = "Додай peony.glb у assets/models";
-  }
 }
 
 exp.onTakeReady = () => {
