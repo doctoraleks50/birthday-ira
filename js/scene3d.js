@@ -127,7 +127,7 @@ export class Experience3D {
     this.scene.add(bg);
   }
 
-  async startBouquetApproach() {
+  startBouquetApproach() {
     this.mode = "bouquet";
     this._takeReady = false;
     this._setBouquetBackdrop();
@@ -137,18 +137,10 @@ export class Experience3D {
       this.bouquet = null;
     }
 
-    try {
-      this.bouquet = await createBouquet();
-    } catch (err) {
-      console.error("bouquet load failed", err);
-      // Empty group so flow still works; UI can show hint
-      this.bouquet = new THREE.Group();
-      this.bouquet.userData.wrap = this.bouquet;
-      this.bouquet.userData.loadError = true;
-    }
-    this.bouquet.position.set(0, -0.55, 0);
+    this.bouquet = createBouquet();
+    this.bouquet.position.set(0, -0.35, 0);
     this.bouquet.rotation.y = 0.2;
-    this._userRot = { x: 0, y: 0.2 };
+    this._userRot = { x: -0.1, y: 0.25 };
     this.scene.add(this.bouquet);
 
     this._buildBalloons();
@@ -158,9 +150,9 @@ export class Experience3D {
     this.camera.position.set(0.3, 1.2, 26);
     this.camera.lookAt(0, 0.6, 0);
     this._camFrom = this.camera.position.clone();
-    this._camTo = new THREE.Vector3(0.1, 0.9, 5.4);
+    this._camTo = new THREE.Vector3(0.15, 0.85, 4.8);
     this._approachT = 0;
-    this._approachDur = 7.2;
+    this._approachDur = 6.5;
   }
 
   takeBouquet() {
@@ -414,7 +406,7 @@ export class Experience3D {
 
   _tickBouquet(dt, t) {
     if (!this.bouquet) return;
-    const wrap = this.bouquet.userData.wrap;
+    const wrap = this.bouquet.userData.wrap || this.bouquet;
 
     // User drag rotation + gentle breathe (no auto spin fighting the drag)
     const swayY = this._drag.active ? 0 : Math.sin(t * 0.35) * 0.04;
