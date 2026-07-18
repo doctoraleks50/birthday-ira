@@ -36,29 +36,30 @@
   <!-- 3. Bouquet UI -->
   <section id="bouquet-ui" class="ui-layer scene hidden">
     <p class="scene-caption">Букет піонів для тебе</p>
+    <p id="bouquet-hint" class="scene-hint">Покрути пальцем або мишею</p>
     <button id="take-btn" class="btn-primary take-btn hidden" type="button">Взяти</button>
   </section>
 
   <!-- 4. Wish / stars UI -->
   <section id="wish-ui" class="ui-layer scene hidden">
     <p id="wish-text" class="wish-text"></p>
-    <button id="cake-btn" class="btn-primary take-btn hidden" type="button">До торта</button>
+    <button id="next-surprise-btn" class="btn-primary take-btn hidden" type="button">Далі</button>
   </section>
 
-  <!-- 5. Cake / blow UI -->
+  <!-- 5. Cake / blow UI (surprise) -->
   <section id="cake-ui" class="ui-layer scene hidden">
-    <p class="scene-caption" id="cake-caption">Задуй свічки — подуй у мікрофон</p>
+    <p class="scene-caption" id="cake-caption">Задуй свічки</p>
     <div id="blow-meter" class="blow-meter hidden" aria-hidden="true">
       <div id="blow-fill" class="blow-fill"></div>
     </div>
     <p id="candle-count" class="candle-count"></p>
-    <button id="mic-btn" class="btn-primary take-btn" type="button">Увімкнути мікрофон</button>
+    <button id="mic-btn" class="btn-primary take-btn hidden" type="button">Увімкнути мікрофон</button>
   </section>
 
   <!-- 6. Finale -->
   <section id="finale" class="overlay scene hidden">
-    <div class="panel">
-      <p id="finale-text" class="wish-text fade-in" style="position:static;transform:none;opacity:1;width:auto;"></p>
+    <div class="panel finale-panel">
+      <p id="finale-text" class="finale-text"></p>
     </div>
   </section>
 
