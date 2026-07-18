@@ -1,4 +1,4 @@
-/** Web Audio — мелодія Happy Birthday + lyrics «dear Ira» */
+/** Web Audio — мелодія Happy Birthday */
 
 const MELODY = [
   { note: "C4", dur: 0.35 },
@@ -28,65 +28,60 @@ const MELODY = [
   { note: "F4", dur: 1.0 },
 ];
 
-const LYRICS = [
-  "Happy birthday to you",
-  "Happy birthday to you",
-  "Happy birthday, dear Ira",
-  "Happy birthday to you",
-];
-
 const FREQ = {
   C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23,
   G4: 392.0, A4: 440.0, Ab4: 415.3, C5: 523.25,
 };
 
 export class BirthdayMusic {
-  constructor(onLyric) {
-    this.onLyric = onLyric || null;
+  constructor() {
     this.ctx = null;
     this.playing = false;
     this._timeouts = [];
-    this._lineIndex = 0;
+    this._unlocked = false;
+  }
+
+  /** Call from a user gesture (button click) so later start() is allowed */
+  async unlock() {
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (this.ctx.state === "suspended") await this.ctx.resume();
+    this._unlocked = true;
+    // silent blip to fully unlock on iOS
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    g.gain.value = 0.0001;
+    osc.connect(g);
+    g.connect(this.ctx.destination);
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.01);
   }
 
   async start() {
     if (this.playing) return;
-    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
     if (this.ctx.state === "suspended") await this.ctx.resume();
     this.playing = true;
-    this._lineIndex = 0;
-    this._playMelody(this.ctx.currentTime + 0.1);
+    this._playMelody(this.ctx.currentTime + 0.05);
   }
 
   _playMelody(startTime) {
     let t = startTime;
     const beat = 0.42;
-    let noteIdx = 0;
 
     for (const { note, dur } of MELODY) {
-      const when = t;
       const duration = dur * beat;
-      this._playNote(note, duration, when);
+      this._playNote(note, duration, t);
       t += duration;
-      noteIdx++;
-
-      // Lyrics on phrase boundaries
-      if (noteIdx === 6 || noteIdx === 12 || noteIdx === 18 || noteIdx === 24) {
-        const line = LYRICS[this._lineIndex++];
-        this._timeouts.push(
-          setTimeout(() => this.onLyric?.(line), (when - this.ctx.currentTime) * 1000)
-        );
-      }
     }
 
-    // Loop after pause
-    const totalDur = (t - startTime) * 1000 + 2000;
+    const totalDur = (t - startTime) * 1000 + 1800;
     this._timeouts.push(
       setTimeout(() => {
-        if (this.playing) {
-          this._lineIndex = 0;
-          this._playMelody(this.ctx.currentTime + 1.5);
-        }
+        if (this.playing) this._playMelody(this.ctx.currentTime + 1.2);
       }, totalDur)
     );
   }
@@ -102,28 +97,25 @@ export class BirthdayMusic {
 
     osc.type = "sine";
     osc.frequency.setValueAtTime(freq, now);
-
     filter.type = "lowpass";
-    filter.frequency.setValueAtTime(2000, now);
+    filter.frequency.setValueAtTime(2200, now);
 
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.22, now + 0.02);
+    gain.gain.linearRampToValueAtTime(0.24, now + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
     osc.connect(filter);
     filter.connect(gain);
     gain.connect(this.ctx.destination);
-
     osc.start(now);
     osc.stop(now + duration + 0.05);
 
-    // Soft harmony
     const osc2 = this.ctx.createOscillator();
     const gain2 = this.ctx.createGain();
     osc2.type = "triangle";
     osc2.frequency.setValueAtTime(freq * 0.5, now);
     gain2.gain.setValueAtTime(0, now);
-    gain2.gain.linearRampToValueAtTime(0.06, now + 0.03);
+    gain2.gain.linearRampToValueAtTime(0.07, now + 0.03);
     gain2.gain.exponentialRampToValueAtTime(0.001, now + duration);
     osc2.connect(gain2);
     gain2.connect(this.ctx.destination);
@@ -135,7 +127,5 @@ export class BirthdayMusic {
     this.playing = false;
     for (const id of this._timeouts) clearTimeout(id);
     this._timeouts = [];
-    this.ctx?.close();
-    this.ctx = null;
   }
 }

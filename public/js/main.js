@@ -10,25 +10,32 @@ const exp = new Experience3D($("#scene3d"));
 exp.start();
 
 const blow = new BlowDetector();
-let music = null;
+const music = new BirthdayMusic();
 let blowLoop = null;
 let cakeDone = false;
 let micReady = false;
 
-function revealParagraph(el, text, wordDelay = 60) {
-  el.innerHTML = "";
-  const words = text.split(/(\s+)/);
-  words.forEach((w, i) => {
+/** Word reveal — spaces stay as text nodes (inline-block ate the spaces before) */
+function revealParagraph(el, text, wordDelay = 55) {
+  el.textContent = "";
+  el.classList.remove("reveal-on");
+  const tokens = text.match(/\S+|\s+/g) || [text];
+  let wordIndex = 0;
+  for (const tok of tokens) {
+    if (/^\s+$/.test(tok)) {
+      el.appendChild(document.createTextNode(tok));
+      continue;
+    }
     const span = document.createElement("span");
-    span.textContent = w;
-    span.style.setProperty("--i", String(i));
     span.className = "reveal-word";
+    span.style.setProperty("--i", String(wordIndex++));
+    span.textContent = tok;
     el.appendChild(span);
-  });
+  }
   el.offsetHeight;
   el.classList.add("reveal-on");
   return new Promise((resolve) => {
-    setTimeout(resolve, words.length * wordDelay + 400);
+    setTimeout(resolve, wordIndex * wordDelay + 450);
   });
 }
 
@@ -45,20 +52,11 @@ async function openGreeting() {
   $("#from-name").textContent = CONFIG.fromName;
   $("#next-btn").classList.add("hidden");
 
-  await revealParagraph($("#greeting-body"), CONFIG.greetingBody, 60);
+  await revealParagraph($("#greeting-body"), CONFIG.greetingBody, 55);
   $("#next-btn").classList.remove("hidden");
 }
 
-/** Mic permission on «Далі» — silently, no spoilers */
-async function goBouquet() {
-  try {
-    await blow.start();
-    micReady = true;
-  } catch (err) {
-    micReady = false;
-    console.warn("mic", err);
-  }
-
+function goBouquet() {
   hide($("#greeting"));
   show($("#bouquet-ui"));
   $("#take-btn").classList.add("hidden");
@@ -78,7 +76,6 @@ exp.onBouquetGone = () => {
   $("#wish-text").textContent = CONFIG.wishText;
   $("#wish-text").classList.add("fade-in");
   exp.startStars();
-  // Neutral «Далі» — surprise, no cake spoilers
   setTimeout(() => {
     const btn = $("#next-surprise-btn");
     btn.classList.remove("hidden");
@@ -93,7 +90,23 @@ function takeBouquet() {
   exp.takeBouquet();
 }
 
-function goSurprise() {
+/** «Далі» після зірок: mic + unlock audio (for finale music), then surprise cake */
+async function goSurprise() {
+  // Unlock audio on this user gesture so Happy Birthday can play later
+  try {
+    await music.unlock();
+  } catch (err) {
+    console.warn("audio unlock", err);
+  }
+
+  try {
+    await blow.start();
+    micReady = true;
+  } catch (err) {
+    micReady = false;
+    console.warn("mic", err);
+  }
+
   hide($("#wish-ui"));
   show($("#cake-ui"));
   $("#candle-count").textContent = "Свічок: 30";
@@ -112,6 +125,7 @@ function goSurprise() {
 
 async function enableMic() {
   try {
+    await music.unlock();
     await blow.start();
     micReady = true;
     $("#mic-btn").classList.add("hidden");
@@ -140,8 +154,7 @@ function startBlowLoop() {
     if (isBlow && intensity > 0.08) {
       accum += intensity;
       if (accum >= 0.35) {
-        const n = Math.min(1, accum);
-        const left = exp.blowCandles(n);
+        const left = exp.blowCandles(Math.min(1, accum));
         accum = 0;
         $("#candle-count").textContent = `Свічок: ${left}`;
       }
@@ -152,6 +165,17 @@ function startBlowLoop() {
   tick();
 }
 
+function showFinale() {
+  hide($("#cake-ui"));
+  show($("#finale"));
+  const el = $("#finale-text");
+  el.textContent = CONFIG.finaleText;
+  el.classList.remove("finale-in");
+  el.offsetHeight;
+  el.classList.add("finale-in");
+  music.start().catch((err) => console.warn("music", err));
+}
+
 exp.onAllCandlesOut = () => {
   if (cakeDone) return;
   cakeDone = true;
@@ -159,18 +183,7 @@ exp.onAllCandlesOut = () => {
   if (blowLoop) cancelAnimationFrame(blowLoop);
   $("#cake-caption").textContent = "Усі свічки задуті";
   $("#candle-count").textContent = "Свічок: 0";
-  setTimeout(async () => {
-    hide($("#cake-ui"));
-    show($("#finale"));
-    $("#finale-text").textContent = CONFIG.finaleText;
-    // Happy Birthday when the message appears
-    try {
-      music = new BirthdayMusic();
-      await music.start();
-    } catch (err) {
-      console.warn("music", err);
-    }
-  }, 1200);
+  setTimeout(showFinale, 900);
 };
 
 $("#open-btn").addEventListener("click", openGreeting);
