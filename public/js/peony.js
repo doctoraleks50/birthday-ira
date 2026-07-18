@@ -1,8 +1,7 @@
 import * as THREE from "three";
 
 /**
- * Clear multi-flower peony bouquet (always visible, no GLB required).
- * If assets/models/peony.glb appears later, we can swap — for now this must work.
+ * Obvious multi-head peony bouquet — 7 separate pink blooms you can count.
  */
 
 function mulberry32(a) {
@@ -15,230 +14,192 @@ function mulberry32(a) {
 }
 
 function petalMat(hex) {
-  return new THREE.MeshPhysicalMaterial({
+  return new THREE.MeshStandardMaterial({
     color: hex,
-    roughness: 0.55,
+    roughness: 0.62,
     metalness: 0,
-    sheen: 0.9,
-    sheenColor: new THREE.Color(0xffe8f0),
-    sheenRoughness: 0.45,
     side: THREE.DoubleSide,
   });
 }
 
-/** Soft round petal disc (readable flower, not cabbage crown) */
-function makePetalGeo() {
-  // Ellipse-ish plane with slight cup via bent segments
-  const geo = new THREE.PlaneGeometry(0.55, 0.7, 8, 10);
+/** Rounded petal as a flat ellipse mesh */
+function petalMesh(mat, w, h) {
+  const geo = new THREE.CircleGeometry(0.5, 20);
+  geo.scale(w, h, 1);
+  // gentle cup
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
-    const nx = x / 0.275;
-    const ny = (y + 0.15) / 0.45;
-    const r = Math.sqrt(nx * nx + ny * ny);
-    // Round silhouette by pushing edge verts inward slightly in z cup
-    const cup = (1 - Math.min(1, r)) * 0.12;
-    pos.setZ(i, cup);
-    // Soft tip roundness: shrink width near tip
-    if (y > 0.15) {
-      const t = (y - 0.15) / 0.35;
-      pos.setX(i, x * (1 - t * 0.35));
-    }
+    pos.setZ(i, (1 - (x * x + y * y) * 4) * 0.08);
   }
   geo.computeVertexNormals();
-  return geo;
+  return new THREE.Mesh(geo, mat);
 }
 
-const _petalGeo = makePetalGeo();
-
-function createLeaf(w, len, color) {
-  const shape = new THREE.Shape();
-  shape.moveTo(0, 0);
-  shape.quadraticCurveTo(w, len * 0.35, 0, len);
-  shape.quadraticCurveTo(-w, len * 0.35, 0, 0);
-  const geo = new THREE.ShapeGeometry(shape, 8);
-  const mesh = new THREE.Mesh(
+function createLeaf(color = 0x2e7d32) {
+  const geo = new THREE.SphereGeometry(0.2, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.55);
+  geo.scale(1.1, 1.8, 0.35);
+  return new THREE.Mesh(
     geo,
-    new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.85,
-      side: THREE.DoubleSide,
-    })
+    new THREE.MeshStandardMaterial({ color, roughness: 0.85, side: THREE.DoubleSide })
   );
-  return mesh;
 }
 
-/**
- * One peony: layered petals around a soft core — reads as a flower head.
- */
-export function createPeony({ scale = 1, seed = 1, open = 1 } = {}) {
-  const group = new THREE.Group();
+/** Compact peony head — clearly one flower */
+export function createPeony({ scale = 1, seed = 1 } = {}) {
+  const g = new THREE.Group();
   const rng = mulberry32(seed);
-  const colors = [0xffc1d6, 0xf48fb1, 0xec407a, 0xe91e63];
 
-  // Short stem (stays inside wrap — not poking out the bottom)
   const stem = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.025, 0.035, 1.1, 8),
-    new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.9 })
+    new THREE.CylinderGeometry(0.022, 0.03, 0.85, 7),
+    new THREE.MeshStandardMaterial({ color: 0x1b5e20, roughness: 0.9 })
   );
-  stem.position.y = -0.55;
-  group.add(stem);
+  stem.position.y = -0.42;
+  g.add(stem);
 
-  for (let i = 0; i < 2; i++) {
-    const leaf = createLeaf(0.18 + rng() * 0.06, 0.55 + rng() * 0.15, 0x388e3c);
-    const side = i % 2 === 0 ? 1 : -1;
-    leaf.position.set(side * 0.06, -0.25 - i * 0.2, 0.02);
-    leaf.rotation.z = side * (0.8 + rng() * 0.25);
-    leaf.rotation.x = -0.3;
-    group.add(leaf);
-  }
+  const leaf = createLeaf();
+  leaf.position.set(0.08, -0.15, 0.02);
+  leaf.rotation.z = 0.9;
+  leaf.scale.setScalar(0.55);
+  g.add(leaf);
 
   const bloom = new THREE.Group();
-  bloom.position.y = 0.15;
-  group.add(bloom);
+  bloom.position.y = 0.12;
+  g.add(bloom);
 
-  // Outer soft ring
-  const layers = [
-    { n: 8, rad: 0.28 * open, tilt: 1.05, s: 1.0, col: colors[0] },
-    { n: 7, rad: 0.2 * open, tilt: 0.85, s: 0.88, col: colors[1] },
-    { n: 6, rad: 0.12 * open, tilt: 0.55, s: 0.72, col: colors[2] },
-    { n: 5, rad: 0.05, tilt: 0.25, s: 0.55, col: colors[3] },
-  ];
+  const palette = [0xffb6c9, 0xff8fb5, 0xf06292, 0xe91e63];
 
-  for (let li = 0; li < layers.length; li++) {
-    const L = layers[li];
-    const mat = petalMat(L.col);
-    const off = rng() * Math.PI * 2;
-    for (let i = 0; i < L.n; i++) {
-      const petal = new THREE.Mesh(_petalGeo, mat);
-      const a = off + (i / L.n) * Math.PI * 2;
-      petal.position.set(Math.cos(a) * L.rad, li * 0.03, Math.sin(a) * L.rad);
-      petal.rotation.order = "YXZ";
-      petal.rotation.y = -a + Math.PI / 2;
-      petal.rotation.x = L.tilt + (rng() - 0.5) * 0.12;
-      petal.rotation.z = (rng() - 0.5) * 0.15;
-      petal.scale.setScalar(L.s * (0.92 + rng() * 0.12));
-      bloom.add(petal);
-    }
+  // Outer petals
+  for (let i = 0; i < 9; i++) {
+    const mat = petalMat(palette[i % 2]);
+    const p = petalMesh(mat, 0.42, 0.5);
+    const a = (i / 9) * Math.PI * 2;
+    p.position.set(Math.cos(a) * 0.22, 0.0, Math.sin(a) * 0.22);
+    p.rotation.order = "YXZ";
+    p.rotation.y = -a + Math.PI / 2;
+    p.rotation.x = 0.95 + (rng() - 0.5) * 0.15;
+    bloom.add(p);
+  }
+  // Mid
+  for (let i = 0; i < 7; i++) {
+    const mat = petalMat(palette[2]);
+    const p = petalMesh(mat, 0.34, 0.4);
+    const a = (i / 7) * Math.PI * 2 + 0.3;
+    p.position.set(Math.cos(a) * 0.12, 0.04, Math.sin(a) * 0.12);
+    p.rotation.order = "YXZ";
+    p.rotation.y = -a + Math.PI / 2;
+    p.rotation.x = 0.65;
+    bloom.add(p);
+  }
+  // Inner
+  for (let i = 0; i < 5; i++) {
+    const mat = petalMat(palette[3]);
+    const p = petalMesh(mat, 0.22, 0.28);
+    const a = (i / 5) * Math.PI * 2;
+    p.position.set(Math.cos(a) * 0.05, 0.08, Math.sin(a) * 0.05);
+    p.rotation.order = "YXZ";
+    p.rotation.y = -a;
+    p.rotation.x = 0.35;
+    bloom.add(p);
   }
 
-  // Soft pink core (small — not a big ball)
   const core = new THREE.Mesh(
-    new THREE.SphereGeometry(0.09, 14, 12),
-    new THREE.MeshStandardMaterial({
-      color: 0xd81b60,
-      roughness: 0.6,
-      emissive: 0x4a0020,
-      emissiveIntensity: 0.1,
-    })
+    new THREE.SphereGeometry(0.08, 12, 10),
+    new THREE.MeshStandardMaterial({ color: 0xc2185b, roughness: 0.55 })
   );
-  core.position.y = 0.08;
+  core.position.y = 0.1;
   bloom.add(core);
 
-  group.scale.setScalar(scale);
-  group.userData.bloom = bloom;
-  group.userData.phase = rng() * Math.PI * 2;
-  return group;
+  g.scale.setScalar(scale);
+  g.userData.bloom = bloom;
+  g.userData.phase = rng() * Math.PI * 2;
+  return g;
 }
 
-function createWrap() {
-  const group = new THREE.Group();
-  const profile = [];
-  for (let i = 0; i <= 24; i++) {
-    const t = i / 24;
-    const y = -1.85 + t * 2.1;
-    const radius = 0.14 + Math.pow(t, 0.9) * 0.95;
-    profile.push(new THREE.Vector2(radius, y));
-  }
-  const kraft = new THREE.Mesh(
-    new THREE.LatheGeometry(profile, 36),
-    new THREE.MeshStandardMaterial({
-      color: 0xc4a574,
-      roughness: 0.92,
-      side: THREE.DoubleSide,
-    })
-  );
-  group.add(kraft);
-
-  // Clear film sheen over kraft
-  const film = new THREE.Mesh(
-    new THREE.LatheGeometry(profile, 36),
-    new THREE.MeshPhysicalMaterial({
-      color: 0xffffff,
-      roughness: 0.1,
-      transmission: 0.7,
-      thickness: 0.2,
-      transparent: true,
-      opacity: 0.35,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    })
-  );
-  film.scale.setScalar(1.02);
-  group.add(film);
-
-  const band = new THREE.Mesh(
-    new THREE.TorusGeometry(0.3, 0.04, 10, 36),
-    new THREE.MeshPhysicalMaterial({
-      color: 0xe91e8c,
-      roughness: 0.3,
-      clearcoat: 0.5,
-      sheen: 0.8,
-      sheenColor: new THREE.Color(0xffb3d4),
-    })
-  );
-  band.position.y = -0.95;
-  band.rotation.x = Math.PI / 2;
-  group.add(band);
-
-  return group;
-}
-
-/** Handheld bouquet — several distinct peony heads + wrap */
 export function createBouquet() {
   const root = new THREE.Group();
   const wrap = new THREE.Group();
   root.add(wrap);
 
-  // Distinct heads spaced apart so it reads as a BOUQUET
+  // Wide fan — heads clearly separated (you can count seven)
   const placements = [
-    { x: 0.0, y: 0.55, z: 0.28, s: 1.15, seed: 11, rx: -0.4, ry: 0.0 },
-    { x: 0.38, y: 0.4, z: 0.18, s: 1.0, seed: 22, rx: -0.35, ry: 0.5 },
-    { x: -0.38, y: 0.42, z: 0.16, s: 1.02, seed: 33, rx: -0.35, ry: -0.5 },
-    { x: 0.22, y: 0.7, z: -0.05, s: 0.92, seed: 44, rx: -0.15, ry: 0.25 },
-    { x: -0.24, y: 0.68, z: -0.08, s: 0.94, seed: 55, rx: -0.15, ry: -0.3 },
-    { x: 0.48, y: 0.28, z: -0.12, s: 0.85, seed: 66, rx: -0.2, ry: 0.85 },
-    { x: -0.48, y: 0.3, z: -0.1, s: 0.85, seed: 77, rx: -0.2, ry: -0.85 },
+    { x: 0.0, y: 0.75, z: 0.35, s: 1.2, seed: 1, rx: -0.55, ry: 0 },
+    { x: 0.55, y: 0.55, z: 0.25, s: 1.05, seed: 2, rx: -0.45, ry: 0.55 },
+    { x: -0.55, y: 0.55, z: 0.25, s: 1.05, seed: 3, rx: -0.45, ry: -0.55 },
+    { x: 0.9, y: 0.35, z: -0.05, s: 0.95, seed: 4, rx: -0.3, ry: 0.95 },
+    { x: -0.9, y: 0.35, z: -0.05, s: 0.95, seed: 5, rx: -0.3, ry: -0.95 },
+    { x: 0.35, y: 0.85, z: -0.2, s: 1.0, seed: 6, rx: -0.25, ry: 0.3 },
+    { x: -0.35, y: 0.85, z: -0.2, s: 1.0, seed: 7, rx: -0.25, ry: -0.3 },
   ];
 
   for (const p of placements) {
-    const flower = createPeony({ scale: p.s, seed: p.seed, open: 1.0 });
-    flower.position.set(p.x, p.y, p.z);
-    flower.rotation.x = p.rx;
-    flower.rotation.y = p.ry;
-    wrap.add(flower);
+    const f = createPeony({ scale: p.s, seed: p.seed });
+    f.position.set(p.x, p.y, p.z);
+    f.rotation.x = p.rx;
+    f.rotation.y = p.ry;
+    wrap.add(f);
   }
 
-  // Greenery peeking between heads
-  const leafSpots = [
-    { x: 0.3, y: 0.35, z: 0.32, rz: 0.9 },
-    { x: -0.28, y: 0.32, z: 0.3, rz: -0.9 },
-    { x: 0.05, y: 0.75, z: 0.1, rz: 0.3 },
-    { x: 0.45, y: 0.5, z: 0.0, rz: 1.1 },
-    { x: -0.45, y: 0.48, z: 0.0, rz: -1.1 },
-  ];
-  for (const s of leafSpots) {
-    const leaf = createLeaf(0.22, 0.7, 0x2e7d32);
-    leaf.position.set(s.x, s.y, s.z);
-    leaf.rotation.z = s.rz;
-    leaf.rotation.x = -0.4;
+  // Filler leaves between heads
+  for (const [x, y, z, rz] of [
+    [0.25, 0.5, 0.4, 0.8],
+    [-0.25, 0.5, 0.4, -0.8],
+    [0.7, 0.4, 0.1, 1.0],
+    [-0.7, 0.4, 0.1, -1.0],
+    [0, 0.95, 0.05, 0.2],
+  ]) {
+    const leaf = createLeaf(0x388e3c);
+    leaf.position.set(x, y, z);
+    leaf.rotation.z = rz;
+    leaf.rotation.x = -0.5;
+    leaf.scale.setScalar(0.7);
     wrap.add(leaf);
   }
 
-  const paper = createWrap();
-  paper.position.y = 0.05;
-  wrap.add(paper);
+  // Kraft cone — stems tuck inside, heads above rim
+  const profile = [];
+  for (let i = 0; i <= 20; i++) {
+    const t = i / 20;
+    const y = -1.5 + t * 1.85;
+    const r = 0.16 + Math.pow(t, 0.95) * 1.05;
+    profile.push(new THREE.Vector2(r, y));
+  }
+  const kraft = new THREE.Mesh(
+    new THREE.LatheGeometry(profile, 40),
+    new THREE.MeshStandardMaterial({
+      color: 0xc4a574,
+      roughness: 0.9,
+      side: THREE.DoubleSide,
+    })
+  );
+  kraft.position.y = 0.1;
+  wrap.add(kraft);
+
+  const film = new THREE.Mesh(
+    new THREE.LatheGeometry(profile, 40),
+    new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      roughness: 0.12,
+      transmission: 0.65,
+      transparent: true,
+      opacity: 0.4,
+      thickness: 0.25,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+  );
+  film.position.y = 0.1;
+  film.scale.setScalar(1.025);
+  wrap.add(film);
+
+  const band = new THREE.Mesh(
+    new THREE.TorusGeometry(0.32, 0.045, 10, 40),
+    new THREE.MeshStandardMaterial({ color: 0xe91e8c, roughness: 0.35 })
+  );
+  band.position.y = -0.75;
+  band.rotation.x = Math.PI / 2;
+  wrap.add(band);
 
   root.userData.wrap = wrap;
   return root;
