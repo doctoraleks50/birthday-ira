@@ -43,6 +43,9 @@ function show(el) { el.classList.remove("hidden"); }
 function hide(el) { el.classList.add("hidden"); }
 
 async function openGreeting() {
+  // Unlock audio early on first tap (iOS/Safari needs a gesture)
+  try { await music.unlock(); } catch { /* ignore */ }
+
   const intro = $("#intro");
   intro.classList.add("fade-out");
   setTimeout(() => hide(intro), 700);
@@ -109,7 +112,6 @@ async function goSurprise() {
 
   hide($("#wish-ui"));
   show($("#cake-ui"));
-  $("#candle-count").textContent = "Свічок: 30";
   exp.startCake();
 
   if (micReady && blow.active) {
@@ -154,9 +156,8 @@ function startBlowLoop() {
     if (isBlow && intensity > 0.08) {
       accum += intensity;
       if (accum >= 0.35) {
-        const left = exp.blowCandles(Math.min(1, accum));
+        exp.blowCandles(Math.min(1, accum));
         accum = 0;
-        $("#candle-count").textContent = `Свічок: ${left}`;
       }
     } else {
       accum *= 0.85;
@@ -165,7 +166,7 @@ function startBlowLoop() {
   tick();
 }
 
-function showFinale() {
+async function showFinale() {
   hide($("#cake-ui"));
   show($("#finale"));
   const el = $("#finale-text");
@@ -173,7 +174,12 @@ function showFinale() {
   el.classList.remove("finale-in");
   el.offsetHeight;
   el.classList.add("finale-in");
-  music.start().catch((err) => console.warn("music", err));
+  try {
+    await music.unlock();
+    await music.start();
+  } catch (err) {
+    console.warn("music", err);
+  }
 }
 
 exp.onAllCandlesOut = () => {
@@ -182,7 +188,6 @@ exp.onAllCandlesOut = () => {
   blow.stop();
   if (blowLoop) cancelAnimationFrame(blowLoop);
   $("#cake-caption").textContent = "Усі свічки задуті";
-  $("#candle-count").textContent = "Свічок: 0";
   setTimeout(showFinale, 900);
 };
 
