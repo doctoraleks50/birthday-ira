@@ -1,33 +1,46 @@
-/** Happy Birthday — HTMLAudioElement + AudioContext unlock (mobile-safe) */
+/** Happy Birthday — keep-alive muted audio so finale unmute always works */
+
+function audioUrl() {
+  // Resolve against the page URL (GitHub Pages subpath-safe)
+  try {
+    return new URL("assets/audio/happy-birthday.wav", window.location.href).href;
+  } catch {
+    return "assets/audio/happy-birthday.wav";
+  }
+}
 
 export class BirthdayMusic {
   constructor() {
     this.audio = null;
     this.ctx = null;
     this.playing = false;
-    this._unlocked = false;
+    this._armed = false; // muted loop already running after a gesture
+    this._loopId = null;
   }
 
   _ensureAudio() {
     if (this.audio) return this.audio;
-    const a = new Audio("assets/audio/happy-birthday.wav");
+    const a = new Audio(audioUrl());
     a.loop = true;
     a.preload = "auto";
-    a.volume = 0.72;
+    a.playsInline = true;
+    a.setAttribute("playsinline", "");
+    a.volume = 0;
+    a.muted = true;
     this.audio = a;
     return a;
   }
 
-  /** Call from a user gesture so later start() is allowed */
+  /** Call from a user gesture — starts a silent looping track (keep-alive) */
   async unlock() {
-    this._ensureAudio();
+    const a = this._ensureAudio();
+
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     }
     if (this.ctx.state === "suspended") {
       try { await this.ctx.resume(); } catch { /* ignore */ }
     }
-    // Silent blip unlocks WebAudio on iOS
     try {
       const osc = this.ctx.createOscillator();
       const g = this.ctx.createGain();
@@ -38,40 +51,47 @@ export class BirthdayMusic {
       osc.stop(this.ctx.currentTime + 0.02);
     } catch { /* ignore */ }
 
-    // Prime HTMLAudio on the same gesture (critical for iOS/Safari)
-    const a = this.audio;
     try {
       a.muted = true;
-      a.currentTime = 0;
-      await a.play();
-      a.pause();
-      a.muted = false;
-      a.currentTime = 0;
-    } catch { /* ignore — may still work after later gesture */ }
-
-    this._unlocked = true;
+      a.volume = 0;
+      if (a.paused) {
+        a.currentTime = 0;
+        await a.play();
+      }
+      this._armed = true;
+    } catch (err) {
+      console.warn("music arm failed", err);
+      this._armed = false;
+    }
   }
 
+  /** Audible playback at finale */
   async start() {
-    if (this.playing) return;
+    if (this.playing && this.audio && !this.audio.muted && this.audio.volume > 0) return;
+
     const a = this._ensureAudio();
     if (this.ctx?.state === "suspended") {
       try { await this.ctx.resume(); } catch { /* ignore */ }
     }
+
     try {
       a.muted = false;
-      a.volume = 0.72;
-      a.currentTime = 0;
-      await a.play();
+      a.volume = 0.78;
+      if (a.paused) {
+        await a.play();
+      }
       this.playing = true;
+      this._armed = true;
+      return;
     } catch (err) {
       console.warn("music play failed", err);
-      // Fallback: synthesize once via WebAudio if file blocked
-      try {
-        await this._fallbackSynth();
-      } catch (e2) {
-        console.warn("music fallback failed", e2);
-      }
+    }
+
+    // WebAudio fallback (works if ctx was unlocked on a gesture)
+    try {
+      await this._fallbackSynth();
+    } catch (e2) {
+      console.warn("music fallback failed", e2);
     }
   }
 
@@ -81,6 +101,7 @@ export class BirthdayMusic {
     }
     if (this.ctx.state === "suspended") await this.ctx.resume();
     this.playing = true;
+
     const MELODY = [
       ["C4", 0.35], ["C4", 0.15], ["D4", 0.5], ["C4", 0.5], ["F4", 0.5], ["E4", 0.75],
       ["C4", 0.35], ["C4", 0.15], ["D4", 0.5], ["C4", 0.5], ["G4", 0.5], ["F4", 0.75],
@@ -98,7 +119,7 @@ export class BirthdayMusic {
       osc.type = "sine";
       osc.frequency.setValueAtTime(freq, t);
       gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.28, t + 0.02);
+      gain.gain.linearRampToValueAtTime(0.32, t + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
       osc.connect(gain);
       gain.connect(this.ctx.destination);
@@ -106,8 +127,7 @@ export class BirthdayMusic {
       osc.stop(t + duration + 0.05);
       t += duration;
     }
-    // loop fallback every ~7s
-    const loopMs = (t - this.ctx.currentTime) * 1000 + 1200;
+    const loopMs = Math.max(1000, (t - this.ctx.currentTime) * 1000 + 900);
     this._loopId = setTimeout(() => {
       if (this.playing) this._fallbackSynth();
     }, loopMs);
@@ -115,9 +135,15 @@ export class BirthdayMusic {
 
   stop() {
     this.playing = false;
+    this._armed = false;
     if (this._loopId) clearTimeout(this._loopId);
     if (this.audio) {
-      try { this.audio.pause(); this.audio.currentTime = 0; } catch { /* ignore */ }
+      try {
+        this.audio.pause();
+        this.audio.currentTime = 0;
+        this.audio.muted = true;
+        this.audio.volume = 0;
+      } catch { /* ignore */ }
     }
   }
 }
