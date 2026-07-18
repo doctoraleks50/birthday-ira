@@ -59,12 +59,17 @@ async function openGreeting() {
   $("#next-btn").classList.remove("hidden");
 }
 
-function goBouquet() {
+async function goBouquet() {
+  try { await music.unlock(); } catch { /* ignore */ }
   hide($("#greeting"));
   show($("#bouquet-ui"));
   $("#take-btn").classList.add("hidden");
   $("#bouquet-hint")?.classList.remove("hidden");
-  exp.startBouquetApproach();
+  await exp.startBouquetApproach();
+  if (exp.bouquet?.userData?.loadError) {
+    const cap = $("#bouquet-ui .scene-caption");
+    if (cap) cap.textContent = "Додай peony.glb у assets/models";
+  }
 }
 
 exp.onTakeReady = () => {
@@ -86,7 +91,8 @@ exp.onBouquetGone = () => {
   }, 3500);
 };
 
-function takeBouquet() {
+async function takeBouquet() {
+  try { await music.unlock(); } catch { /* ignore */ }
   $("#take-btn").classList.add("hidden");
   $("#bouquet-ui .scene-caption")?.classList.add("fade-out");
   $("#bouquet-hint")?.classList.add("fade-out");
@@ -174,8 +180,8 @@ async function showFinale() {
   el.classList.remove("finale-in");
   el.offsetHeight;
   el.classList.add("finale-in");
+  // Audio was armed muted on earlier gestures — just unmute / play
   try {
-    await music.unlock();
     await music.start();
   } catch (err) {
     console.warn("music", err);

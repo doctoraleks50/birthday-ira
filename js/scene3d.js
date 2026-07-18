@@ -127,15 +127,25 @@ export class Experience3D {
     this.scene.add(bg);
   }
 
-  startBouquetApproach() {
+  async startBouquetApproach() {
     this.mode = "bouquet";
     this._takeReady = false;
     this._setBouquetBackdrop();
 
     if (this.bouquet) {
       this.scene.remove(this.bouquet);
+      this.bouquet = null;
     }
-    this.bouquet = createBouquet();
+
+    try {
+      this.bouquet = await createBouquet();
+    } catch (err) {
+      console.error("bouquet load failed", err);
+      // Empty group so flow still works; UI can show hint
+      this.bouquet = new THREE.Group();
+      this.bouquet.userData.wrap = this.bouquet;
+      this.bouquet.userData.loadError = true;
+    }
     this.bouquet.position.set(0, -0.55, 0);
     this.bouquet.rotation.y = 0.2;
     this._userRot = { x: 0, y: 0.2 };
