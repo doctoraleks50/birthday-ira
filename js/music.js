@@ -42,7 +42,7 @@ const FREQ = {
 
 export class BirthdayMusic {
   constructor(onLyric) {
-    this.onLyric = onLyric;
+    this.onLyric = onLyric || null;
     this.ctx = null;
     this.playing = false;
     this._timeouts = [];
