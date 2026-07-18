@@ -24,12 +24,10 @@ function makePetalTexture(hex, seed = 1) {
   const cx = size * 0.5;
   const cy = size * 0.55;
 
-  // Soft elliptical petal body
   const g = ctx.createRadialGradient(cx, cy * 0.85, size * 0.02, cx, cy, size * 0.48);
   const col = new THREE.Color(hex);
   const light = col.clone().lerp(new THREE.Color(0xfff0f6), 0.45);
   const mid = col.clone().lerp(new THREE.Color(0xffc0d8), 0.15);
-  const deep = col.clone().lerp(new THREE.Color(0x8b1048), 0.25);
   g.addColorStop(0, `#${light.getHexString()}`);
   g.addColorStop(0.45, `#${mid.getHexString()}`);
   g.addColorStop(0.78, `#${col.getHexString()}`);
@@ -45,7 +43,6 @@ function makePetalTexture(hex, seed = 1) {
   ctx.fill();
   ctx.restore();
 
-  // Soft paper veins
   ctx.globalCompositeOperation = "soft-light";
   ctx.strokeStyle = `rgba(255,230,240,${0.18 + rng() * 0.1})`;
   ctx.lineWidth = 1.2;
@@ -58,7 +55,6 @@ function makePetalTexture(hex, seed = 1) {
   }
   ctx.globalCompositeOperation = "source-over";
 
-  // Feather edge alpha
   const img = ctx.getImageData(0, 0, size, size);
   const d = img.data;
   for (let y = 0; y < size; y++) {
@@ -96,19 +92,22 @@ function petalMat(hex, seed) {
   });
 }
 
-function createLeaf(w, len) {
-  const segsU = 10;
-  const segsV = 14;
+function createLeaf(w, len, color = 0x1f5c32) {
+  const segsU = 12;
+  const segsV = 18;
   const positions = [];
   const indices = [];
   for (let j = 0; j <= segsV; j++) {
     const v = j / segsV;
     const y = v * len;
-    const half = w * Math.sin(v * Math.PI) * Math.pow(1 - v * 0.15, 0.5);
+    const belly = Math.sin(v * Math.PI);
+    const tip = Math.pow(Math.max(0, 1 - v), 0.45);
+    const serr = 1 + Math.sin(v * Math.PI * 5) * 0.06 * (v > 0.15 && v < 0.85 ? 1 : 0);
+    const half = w * belly * tip * serr;
     for (let i = 0; i <= segsU; i++) {
       const u = i / segsU;
       const x = (u * 2 - 1) * half;
-      const z = Math.sin(v * Math.PI) * 0.04 * (1 - Math.abs(u * 2 - 1) * 0.4);
+      const z = Math.sin(v * Math.PI) * 0.06 * (1 - Math.abs(u * 2 - 1) * 0.45);
       positions.push(x, y, z);
     }
   }
@@ -126,11 +125,53 @@ function createLeaf(w, len) {
   return new THREE.Mesh(
     geo,
     new THREE.MeshStandardMaterial({
-      color: 0x1f5c32,
-      roughness: 0.85,
+      color,
+      roughness: 0.82,
       side: THREE.DoubleSide,
     })
   );
+}
+
+/** Closed / half-open bud nestled among blooms */
+function createBud({ scale = 0.55, seed = 1 } = {}) {
+  const group = new THREE.Group();
+  const rng = mulberry32(seed);
+  const stem = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.02, 0.03, 1.4, 6),
+    new THREE.MeshStandardMaterial({ color: 0x2f6b3a, roughness: 0.9 })
+  );
+  stem.position.y = -0.75;
+  group.add(stem);
+
+  const calyx = new THREE.Mesh(
+    new THREE.SphereGeometry(0.1, 10, 8),
+    new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.85 })
+  );
+  calyx.position.y = 0.02;
+  calyx.scale.set(1, 1.15, 1);
+  group.add(calyx);
+
+  const petalGeo = new THREE.PlaneGeometry(1, 1.1);
+  const mat = petalMat(0xf06292, seed);
+  for (let i = 0; i < 6; i++) {
+    const p = new THREE.Mesh(petalGeo, mat);
+    const a = (i / 6) * Math.PI * 2;
+    p.position.set(Math.cos(a) * 0.04, 0.08, Math.sin(a) * 0.04);
+    p.rotation.order = "YXZ";
+    p.rotation.y = -a + Math.PI / 2;
+    p.rotation.x = 0.55 + rng() * 0.2;
+    p.scale.setScalar(0.28);
+    group.add(p);
+  }
+
+  // Small leaf under bud
+  const leaf = createLeaf(0.22, 0.55, 0x256b38);
+  leaf.position.set(0.06, -0.15, 0.02);
+  leaf.rotation.z = 0.9;
+  group.add(leaf);
+
+  group.scale.setScalar(scale);
+  return group;
 }
 
 /**
@@ -153,12 +194,17 @@ export function createPeony({
   stem.position.y = -1.4;
   group.add(stem);
 
-  for (let i = 0; i < 3; i++) {
-    const leaf = createLeaf(0.26 + rng() * 0.1, 0.7 + rng() * 0.2);
+  for (let i = 0; i < 4; i++) {
+    const leaf = createLeaf(
+      0.3 + rng() * 0.12,
+      0.85 + rng() * 0.25,
+      i % 2 ? 0x256b38 : 0x1b5e2a
+    );
     const side = i % 2 === 0 ? 1 : -1;
-    leaf.position.set(side * (0.07 + rng() * 0.05), -0.5 - i * 0.32, (rng() - 0.5) * 0.08);
-    leaf.rotation.z = side * (0.65 + rng() * 0.3);
-    leaf.rotation.y = rng() * 0.5;
+    leaf.position.set(side * (0.08 + rng() * 0.06), -0.35 - i * 0.28, (rng() - 0.5) * 0.1);
+    leaf.rotation.z = side * (0.75 + rng() * 0.35);
+    leaf.rotation.y = rng() * 0.6;
+    leaf.rotation.x = -0.15 + rng() * 0.25;
     group.add(leaf);
   }
 
@@ -202,7 +248,6 @@ export function createPeony({
     }
   });
 
-  // Soft dense core
   const core = new THREE.Mesh(
     new THREE.SphereGeometry(0.12, 18, 14),
     new THREE.MeshStandardMaterial({
@@ -215,7 +260,6 @@ export function createPeony({
   core.position.y = 0.16;
   bloom.add(core);
 
-  // Tiny inner petal fluff
   const fluffMat = petalMat(0xffb3d4, seed + 99);
   for (let i = 0; i < 8; i++) {
     const p = new THREE.Mesh(petalGeo, fluffMat);
@@ -234,11 +278,12 @@ export function createPeony({
   return group;
 }
 
-/** Handheld bouquet: 7 peonies in kraft wrap + satin ribbon */
+/** Handheld bouquet: peonies + buds + greenery between blooms */
 export function createBouquet() {
   const root = new THREE.Group();
   const wrap = new THREE.Group();
   root.add(wrap);
+  const rng = mulberry32(2026);
 
   const placements = [
     { x: 0.0, y: 0.14, z: 0.38, s: 1.15, seed: 11, open: 1.0, rx: -0.28, ry: 0.0 },
@@ -256,6 +301,47 @@ export function createBouquet() {
     flower.rotation.x = p.rx;
     flower.rotation.y = p.ry;
     wrap.add(flower);
+  }
+
+  // Closed buds between open blooms
+  const buds = [
+    { x: 0.28, y: 0.42, z: 0.12, s: 0.62, seed: 101, rx: -0.2, ry: 0.3 },
+    { x: -0.3, y: 0.4, z: 0.1, s: 0.58, seed: 102, rx: -0.18, ry: -0.35 },
+    { x: 0.08, y: 0.48, z: -0.05, s: 0.55, seed: 103, rx: 0.05, ry: 0.1 },
+  ];
+  for (const b of buds) {
+    const bud = createBud({ scale: b.s, seed: b.seed });
+    bud.position.set(b.x, b.y, b.z);
+    bud.rotation.x = b.rx;
+    bud.rotation.y = b.ry;
+    wrap.add(bud);
+  }
+
+  // Large filler leaves peeking BETWEEN flowers
+  const leafSpots = [
+    { x: 0.32, y: 0.22, z: 0.42, rx: -0.5, ry: 0.2, rz: 0.9, w: 0.42, len: 1.15 },
+    { x: -0.3, y: 0.2, z: 0.4, rx: -0.45, ry: -0.15, rz: -0.95, w: 0.4, len: 1.1 },
+    { x: 0.58, y: 0.18, z: 0.18, rx: -0.3, ry: 0.8, rz: 1.1, w: 0.38, len: 1.05 },
+    { x: -0.58, y: 0.16, z: 0.16, rx: -0.3, ry: -0.8, rz: -1.1, w: 0.38, len: 1.05 },
+    { x: 0.12, y: 0.35, z: -0.35, rx: 0.15, ry: 0.4, rz: 0.7, w: 0.36, len: 1.0 },
+    { x: -0.15, y: 0.32, z: -0.38, rx: 0.12, ry: -0.45, rz: -0.75, w: 0.36, len: 1.0 },
+    { x: 0.4, y: -0.05, z: 0.45, rx: -0.7, ry: 0.1, rz: 0.55, w: 0.34, len: 0.95 },
+    { x: -0.38, y: -0.02, z: 0.48, rx: -0.65, ry: -0.1, rz: -0.5, w: 0.34, len: 0.95 },
+    { x: 0.0, y: 0.5, z: 0.2, rx: -0.35, ry: 0.0, rz: 0.35, w: 0.32, len: 0.9 },
+    { x: 0.5, y: 0.35, z: -0.1, rx: -0.1, ry: 1.0, rz: 1.2, w: 0.35, len: 1.0 },
+    { x: -0.5, y: 0.33, z: -0.08, rx: -0.1, ry: -1.0, rz: -1.2, w: 0.35, len: 1.0 },
+    { x: 0.22, y: 0.05, z: 0.55, rx: -0.85, ry: 0.25, rz: 0.4, w: 0.3, len: 0.85 },
+  ];
+  for (let i = 0; i < leafSpots.length; i++) {
+    const spot = leafSpots[i];
+    const leaf = createLeaf(
+      spot.w * (0.9 + rng() * 0.2),
+      spot.len * (0.9 + rng() * 0.15),
+      i % 3 === 0 ? 0x2e7d32 : i % 3 === 1 ? 0x1b5e20 : 0x388e3c
+    );
+    leaf.position.set(spot.x, spot.y, spot.z);
+    leaf.rotation.set(spot.rx, spot.ry, spot.rz);
+    wrap.add(leaf);
   }
 
   // Kraft paper wrap

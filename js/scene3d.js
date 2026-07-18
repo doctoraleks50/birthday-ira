@@ -184,7 +184,7 @@ export class Experience3D {
     this._buildStarfield();
     this.camera.position.set(0, 0, 8);
     this.camera.lookAt(0, 0, 0);
-    this._shootTimer = 0;
+    this._shootTimer = 0.2; // first streak soon after wish scene opens
   }
 
   /** Transition from stars → birthday cake with 30 candles */
@@ -196,8 +196,10 @@ export class Experience3D {
     if (this.milky) { this.scene.remove(this.milky); this.milky = null; }
     for (const s of this.shooting) {
       this.scene.remove(s.mesh);
-      s.mesh.geometry.dispose();
-      s.mesh.material.dispose();
+      s.line?.geometry?.dispose();
+      s.line?.material?.dispose();
+      s.head?.geometry?.dispose();
+      s.head?.material?.dispose();
     }
     this.shooting = [];
 
@@ -296,40 +298,70 @@ export class Experience3D {
   }
 
   _spawnShootingStar() {
-    const geo = new THREE.BufferGeometry();
-    const trail = 14;
-    const pos = new Float32Array(trail * 3);
-    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    // Streak line + bright head (Points looked like a stuck dot)
+    const start = new THREE.Vector3(
+      4 + Math.random() * 8,
+      3.5 + Math.random() * 4,
+      -8 - Math.random() * 4
+    );
+    const vel = new THREE.Vector3(
+      -10 - Math.random() * 6,
+      -6 - Math.random() * 4,
+      1.5 + Math.random() * 2
+    );
+    const trailLen = 2.8 + Math.random() * 1.2;
+    const dir = vel.clone().normalize();
 
-    const mat = new THREE.PointsMaterial({
-      color: 0xfff8e7,
-      size: 0.25,
+    const positions = new Float32Array(6);
+    // head
+    positions[0] = start.x;
+    positions[1] = start.y;
+    positions[2] = start.z;
+    // tail
+    positions[3] = start.x - dir.x * trailLen;
+    positions[4] = start.y - dir.y * trailLen;
+    positions[5] = start.z - dir.z * trailLen;
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const lineMat = new THREE.LineBasicMaterial({
+      color: 0xfff4d6,
       transparent: true,
-      opacity: 1,
+      opacity: 0.95,
       depthWrite: false,
       blending: AdditiveBlendingSafe(),
     });
-    const mesh = new THREE.Points(geo, mat);
+    const line = new THREE.Line(geo, lineMat);
+    line.frustumCulled = false;
 
-    const start = new THREE.Vector3(
-      (Math.random() - 0.5) * 16 + 6,
-      6 + Math.random() * 5,
-      -5 - Math.random() * 8
+    const head = new THREE.Mesh(
+      new THREE.SphereGeometry(0.08, 10, 8),
+      new THREE.MeshBasicMaterial({
+        color: 0xfff8e7,
+        transparent: true,
+        opacity: 1,
+        depthWrite: false,
+        blending: AdditiveBlendingSafe(),
+      })
     );
-    const vel = new THREE.Vector3(
-      -8 - Math.random() * 6,
-      -5 - Math.random() * 4,
-      2 + Math.random() * 2
-    );
+    head.position.copy(start);
+    head.frustumCulled = false;
 
-    this.scene.add(mesh);
+    const group = new THREE.Group();
+    group.add(line);
+    group.add(head);
+    group.frustumCulled = false;
+    this.scene.add(group);
+
     this.shooting.push({
-      mesh,
+      mesh: group,
+      line,
+      head,
       pos: start.clone(),
       vel,
-      life: 1.4 + Math.random() * 0.8,
+      trailLen,
+      life: 1.6 + Math.random() * 0.7,
       age: 0,
-      trail,
     });
   }
 
@@ -635,29 +667,37 @@ export class Experience3D {
     this._shootTimer -= dt;
     if (this._shootTimer <= 0) {
       this._spawnShootingStar();
-      this._shootTimer = 1.6 + Math.random() * 2.2;
+      this._shootTimer = 0.9 + Math.random() * 1.4;
     }
 
     for (let i = this.shooting.length - 1; i >= 0; i--) {
       const s = this.shooting[i];
       s.age += dt;
       s.pos.addScaledVector(s.vel, dt);
-      const arr = s.mesh.geometry.attributes.position.array;
-      for (let p = s.trail - 1; p > 0; p--) {
-        arr[p * 3] = arr[(p - 1) * 3];
-        arr[p * 3 + 1] = arr[(p - 1) * 3 + 1];
-        arr[p * 3 + 2] = arr[(p - 1) * 3 + 2];
-      }
+
+      const dir = s.vel.clone().normalize();
+      const arr = s.line.geometry.attributes.position.array;
       arr[0] = s.pos.x;
       arr[1] = s.pos.y;
       arr[2] = s.pos.z;
-      s.mesh.geometry.attributes.position.needsUpdate = true;
-      s.mesh.material.opacity = Math.max(0, 1 - s.age / s.life);
+      arr[3] = s.pos.x - dir.x * s.trailLen;
+      arr[4] = s.pos.y - dir.y * s.trailLen;
+      arr[5] = s.pos.z - dir.z * s.trailLen;
+      s.line.geometry.attributes.position.needsUpdate = true;
+      s.line.geometry.computeBoundingSphere();
+      s.head.position.copy(s.pos);
+
+      const fade = Math.max(0, 1 - s.age / s.life);
+      s.line.material.opacity = 0.25 + fade * 0.75;
+      s.head.material.opacity = fade;
+      s.head.scale.setScalar(0.7 + fade * 0.6);
 
       if (s.age >= s.life) {
         this.scene.remove(s.mesh);
-        s.mesh.geometry.dispose();
-        s.mesh.material.dispose();
+        s.line.geometry.dispose();
+        s.line.material.dispose();
+        s.head.geometry.dispose();
+        s.head.material.dispose();
         this.shooting.splice(i, 1);
       }
     }
