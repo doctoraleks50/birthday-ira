@@ -1,6 +1,7 @@
 import { CONFIG } from "./config.js";
 import { Experience3D } from "./scene3d.js";
 import { BlowDetector } from "./blow.js";
+import { BirthdayMusic } from "./music.js";
 
 document.title = CONFIG.siteTitle;
 const $ = (sel) => document.querySelector(sel);
@@ -9,8 +10,10 @@ const exp = new Experience3D($("#scene3d"));
 exp.start();
 
 const blow = new BlowDetector();
+let music = null;
 let blowLoop = null;
 let cakeDone = false;
+let micReady = false;
 
 function revealParagraph(el, text, wordDelay = 60) {
   el.innerHTML = "";
@@ -46,10 +49,20 @@ async function openGreeting() {
   $("#next-btn").classList.remove("hidden");
 }
 
-function goBouquet() {
+/** Mic permission on «Далі» — silently, no spoilers */
+async function goBouquet() {
+  try {
+    await blow.start();
+    micReady = true;
+  } catch (err) {
+    micReady = false;
+    console.warn("mic", err);
+  }
+
   hide($("#greeting"));
   show($("#bouquet-ui"));
   $("#take-btn").classList.add("hidden");
+  $("#bouquet-hint")?.classList.remove("hidden");
   exp.startBouquetApproach();
 }
 
@@ -65,9 +78,9 @@ exp.onBouquetGone = () => {
   $("#wish-text").textContent = CONFIG.wishText;
   $("#wish-text").classList.add("fade-in");
   exp.startStars();
-  // Show "to cake" after wish sinks in
+  // Neutral «Далі» — surprise, no cake spoilers
   setTimeout(() => {
-    const btn = $("#cake-btn");
+    const btn = $("#next-surprise-btn");
     btn.classList.remove("hidden");
     btn.classList.add("pop-in");
   }, 3500);
@@ -76,19 +89,31 @@ exp.onBouquetGone = () => {
 function takeBouquet() {
   $("#take-btn").classList.add("hidden");
   $("#bouquet-ui .scene-caption")?.classList.add("fade-out");
+  $("#bouquet-hint")?.classList.add("fade-out");
   exp.takeBouquet();
 }
 
-function goCake() {
+function goSurprise() {
   hide($("#wish-ui"));
   show($("#cake-ui"));
   $("#candle-count").textContent = "Свічок: 30";
   exp.startCake();
+
+  if (micReady && blow.active) {
+    $("#mic-btn").classList.add("hidden");
+    $("#blow-meter").classList.remove("hidden");
+    $("#cake-caption").textContent = "Подуй у мікрофон — чим сильніше, тим більше свічок";
+    startBlowLoop();
+  } else {
+    $("#mic-btn").classList.remove("hidden");
+    $("#cake-caption").textContent = "Задуй свічки";
+  }
 }
 
 async function enableMic() {
   try {
     await blow.start();
+    micReady = true;
     $("#mic-btn").classList.add("hidden");
     $("#blow-meter").classList.remove("hidden");
     $("#cake-caption").textContent = "Подуй у мікрофон — чим сильніше, тим більше свічок";
@@ -107,12 +132,13 @@ function startBlowLoop() {
     if (cakeDone) return;
     const { intensity, isBlow } = blow.sample();
     const fill = $("#blow-fill");
-    fill.style.width = `${Math.round(intensity * 100)}%`;
-    fill.classList.toggle("hot", intensity > 0.5);
+    if (fill) {
+      fill.style.width = `${Math.round(intensity * 100)}%`;
+      fill.classList.toggle("hot", intensity > 0.5);
+    }
 
     if (isBlow && intensity > 0.08) {
       accum += intensity;
-      // Extinguish in bursts so strong blows clear many at once
       if (accum >= 0.35) {
         const n = Math.min(1, accum);
         const left = exp.blowCandles(n);
@@ -133,15 +159,22 @@ exp.onAllCandlesOut = () => {
   if (blowLoop) cancelAnimationFrame(blowLoop);
   $("#cake-caption").textContent = "Усі свічки задуті";
   $("#candle-count").textContent = "Свічок: 0";
-  setTimeout(() => {
+  setTimeout(async () => {
     hide($("#cake-ui"));
     show($("#finale"));
     $("#finale-text").textContent = CONFIG.finaleText;
+    // Happy Birthday when the message appears
+    try {
+      music = new BirthdayMusic();
+      await music.start();
+    } catch (err) {
+      console.warn("music", err);
+    }
   }, 1200);
 };
 
 $("#open-btn").addEventListener("click", openGreeting);
 $("#next-btn").addEventListener("click", goBouquet);
 $("#take-btn").addEventListener("click", takeBouquet);
-$("#cake-btn").addEventListener("click", goCake);
+$("#next-surprise-btn").addEventListener("click", goSurprise);
 $("#mic-btn").addEventListener("click", enableMic);

@@ -42,14 +42,41 @@ export class Experience3D {
     this._resize();
 
     this._pointer = new THREE.Vector2(0, 0);
+    this._drag = { active: false, x: 0, y: 0, lastX: 0, lastY: 0 };
+    this._userRot = { x: 0, y: 0.2 };
+
     window.addEventListener(
       "pointermove",
       (e) => {
         this._pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
         this._pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        if (this._drag.active && (this.mode === "bouquet")) {
+          const dx = e.clientX - this._drag.lastX;
+          const dy = e.clientY - this._drag.lastY;
+          this._drag.lastX = e.clientX;
+          this._drag.lastY = e.clientY;
+          this._userRot.y += dx * 0.008;
+          this._userRot.x += dy * 0.006;
+          // Clamp tilt so bouquet doesn't flip upside-down
+          this._userRot.x = Math.max(-0.85, Math.min(0.55, this._userRot.x));
+        }
       },
       { passive: true }
     );
+
+    const onDown = (e) => {
+      if (this.mode !== "bouquet") return;
+      // Don't steal clicks from UI buttons
+      if (e.target?.closest?.("button, a")) return;
+      this._drag.active = true;
+      this._drag.lastX = e.clientX;
+      this._drag.lastY = e.clientY;
+      try { this.canvas.setPointerCapture?.(e.pointerId); } catch { /* ignore */ }
+    };
+    const onUp = () => { this._drag.active = false; };
+    this.canvas.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   }
 
   _buildLights() {
@@ -111,6 +138,7 @@ export class Experience3D {
     this.bouquet = createBouquet();
     this.bouquet.position.set(0, -0.55, 0);
     this.bouquet.rotation.y = 0.2;
+    this._userRot = { x: 0, y: 0.2 };
     this.scene.add(this.bouquet);
 
     this._buildBalloons();
@@ -346,9 +374,11 @@ export class Experience3D {
     if (!this.bouquet) return;
     const wrap = this.bouquet.userData.wrap;
 
-    // Subtle sway + breathe
-    wrap.rotation.y = Math.sin(t * 0.35) * 0.12 + this._pointer.x * 0.15;
-    wrap.rotation.x = Math.sin(t * 0.28) * 0.04 + this._pointer.y * 0.05;
+    // User drag rotation + gentle breathe (no auto spin fighting the drag)
+    const swayY = this._drag.active ? 0 : Math.sin(t * 0.35) * 0.04;
+    const swayX = this._drag.active ? 0 : Math.sin(t * 0.28) * 0.02;
+    wrap.rotation.y = this._userRot.y + swayY;
+    wrap.rotation.x = this._userRot.x + swayX;
     wrap.position.y = Math.sin(t * 0.9) * 0.04;
 
     // Petal micro-motion
