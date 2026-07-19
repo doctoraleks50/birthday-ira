@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { createBouquet } from "./peony.js";
+import { createBouquet, preloadBouquetTextures } from "./peony.js";
 import { createCake } from "./cake.js";
 
 export class Experience3D {
@@ -36,6 +36,9 @@ export class Experience3D {
     this.shooting = [];
     this.balloons = null;
     this.confetti = null;
+
+    // Warm bouquet textures while user is still on intro/greeting
+    preloadBouquetTextures().catch(() => {});
 
     this._onResize = () => this._resize();
     window.addEventListener("resize", this._onResize);
@@ -152,13 +155,13 @@ export class Experience3D {
     this._buildBalloons();
     this._buildConfetti();
 
-    // Start far — end close enough to fill frame with bouquet + balloons above
-    this.camera.position.set(0.2, 1.0, 24);
+    // Start nearby — short glide so bouquet is readable right away
+    this.camera.position.set(0.15, 0.95, 9.5);
     this.camera.lookAt(0, 0.55, 0);
     this._camFrom = this.camera.position.clone();
     this._camTo = new THREE.Vector3(0.1, 0.85, 5.0);
     this._approachT = 0;
-    this._approachDur = 6.2;
+    this._approachDur = 2.0;
   }
 
   takeBouquet() {

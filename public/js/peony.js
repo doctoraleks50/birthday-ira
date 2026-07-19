@@ -6,15 +6,30 @@ import * as THREE from "three";
  */
 
 const BASE = new URL("../assets/bouquet/", import.meta.url);
+const NAMES = ["peony-front.webp", "peony-threeq.webp", "peony-top.webp"];
+
+let _texPromise = null;
 
 function loadTex(name) {
   const loader = new THREE.TextureLoader();
   return loader.loadAsync(new URL(name, BASE).href).then((tex) => {
     tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 8;
+    tex.anisotropy = 4;
     tex.needsUpdate = true;
     return tex;
   });
+}
+
+/** Start downloading textures ASAP (intro / greeting). */
+export function preloadBouquetTextures() {
+  if (!_texPromise) {
+    _texPromise = Promise.all(NAMES.map(loadTex)).catch((err) => {
+      console.warn("bouquet preload", err);
+      _texPromise = null;
+      throw err;
+    });
+  }
+  return _texPromise;
 }
 
 function makeCard(tex, w, h) {
@@ -25,25 +40,19 @@ function makeCard(tex, w, h) {
     depthWrite: false,
     side: THREE.DoubleSide,
   });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
-  return mesh;
+  return new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
 }
 
 /**
  * Async bouquet: beautiful painted peonies as layered cards.
  */
 export async function createBouquet() {
-  const [frontTex, threeQTex, topTex] = await Promise.all([
-    loadTex("peony-front.png"),
-    loadTex("peony-threeq.png"),
-    loadTex("peony-top.png"),
-  ]);
+  const [frontTex, threeQTex, topTex] = await preloadBouquetTextures();
 
   const root = new THREE.Group();
   const wrap = new THREE.Group();
   root.add(wrap);
 
-  // Aspect ~3:4 for front/threeQ; top is square
   const front = makeCard(frontTex, 2.55, 3.2);
   const threeQ = makeCard(threeQTex, 2.55, 3.2);
   const top = makeCard(topTex, 2.7, 2.7);
@@ -60,7 +69,6 @@ export async function createBouquet() {
   wrap.add(threeQ);
   wrap.add(top);
 
-  // Soft ground shadow disc under bouquet
   const shadow = new THREE.Mesh(
     new THREE.CircleGeometry(1.1, 32),
     new THREE.MeshBasicMaterial({
@@ -79,14 +87,12 @@ export async function createBouquet() {
   root.userData.fromPhotos = true;
   root.userData.phase = 0;
 
-  // Soft breathing for bloom group compatibility with scene tick
   front.userData.bloom = front;
   front.userData.phase = 0;
 
   return root;
 }
 
-/** Sync stub kept for any old imports */
 export function createPeony() {
   return new THREE.Group();
 }

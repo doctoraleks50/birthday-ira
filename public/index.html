@@ -9,7 +9,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Great+Vibes&family=Playfair+Display:ital,wght@0,500;0,700;1,500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=23" />
+  <link rel="stylesheet" href="css/style.css?v=24" />
+  <link rel="preload" as="image" href="assets/bouquet/peony-front.webp" />
+  <link rel="preload" as="image" href="assets/bouquet/peony-threeq.webp" />
+  <link rel="preload" as="image" href="assets/bouquet/peony-top.webp" />
 </head>
 <body>
   <canvas id="scene3d" aria-hidden="true"></canvas>
@@ -58,7 +61,7 @@
   <section id="finale" class="overlay scene hidden">
     <div class="finale-panel">
       <p id="finale-text" class="finale-text"></p>
-      <button id="music-btn" class="btn-primary music-btn" type="button">Увімкнути музику</button>
+      <button id="music-btn" class="btn-primary music-btn hidden" type="button">Увімкнути музику</button>
     </div>
   </section>
 
@@ -70,6 +73,6 @@
     }
   }
   </script>
-  <script type="module" src="js/main.js?v=23"></script>
+  <script type="module" src="js/main.js?v=24"></script>
 </body>
 </html>
