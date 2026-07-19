@@ -176,21 +176,20 @@ async function showFinale() {
   el.classList.add("finale-in");
 
   const musicBtn = $("#music-btn");
-  musicBtn?.classList.remove("hidden");
-
+  // Music should already be starting from candle blow; reinforce + show button if blocked
   const tryMusic = async () => {
     try {
       await music.start();
       if (music.isAudible()) musicBtn?.classList.add("hidden");
+      else musicBtn?.classList.remove("hidden");
     } catch (err) {
       console.warn("music", err);
+      musicBtn?.classList.remove("hidden");
     }
   };
   await tryMusic();
-  setTimeout(tryMusic, 350);
-  setTimeout(tryMusic, 1000);
+  setTimeout(tryMusic, 500);
 
-  // Keep button as reliable gesture fallback (phones often block autoplay)
   musicBtn?.addEventListener("click", async (e) => {
     e.preventDefault();
     try {
@@ -209,6 +208,8 @@ exp.onAllCandlesOut = () => {
   blow.stop();
   if (blowLoop) cancelAnimationFrame(blowLoop);
   $("#cake-caption").textContent = "Усі свічки задуті";
+  // Music starts the moment the last candle goes out
+  music.start().catch(() => {});
   setTimeout(showFinale, 900);
 };
 
