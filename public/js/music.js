@@ -1,15 +1,20 @@
-/** Happy Birthday — WebAudio keep-alive so finale unmute works without a fresh gesture */
+/**
+ * Happy Birthday music.
+ * Never use audio.muted=true for keep-alive — on iOS unmute often stays silent.
+ * Arm with unmuted + near-zero volume on gestures; raise volume at finale.
+ */
 
-function audioUrl() {
+function audioUrl(name = "happy-birthday.wav") {
   try {
-    return new URL("assets/audio/happy-birthday.wav", window.location.href).href;
+    return new URL(`assets/audio/${name}`, window.location.href).href;
   } catch {
-    return "assets/audio/happy-birthday.wav";
+    return `assets/audio/${name}`;
   }
 }
 
 export class BirthdayMusic {
   constructor() {
+    this.audio = null;
     this.ctx = null;
     this.buffer = null;
     this.source = null;
@@ -18,181 +23,215 @@ export class BirthdayMusic {
     this._armed = false;
     this._loading = null;
     this._loopId = null;
-    this.audio = null; // HTMLAudio fallback
+    this._keepAlive = null;
   }
 
-  _ensureCtx() {
-    if (!this.ctx) {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    return this.ctx;
+  _ensureAudio() {
+    if (this.audio) return this.audio;
+    const a = new Audio();
+    a.preload = "auto";
+    a.loop = true;
+    a.playsInline = true;
+    a.setAttribute("playsinline", "");
+    a.setAttribute("webkit-playsinline", "");
+    a.crossOrigin = "anonymous";
+    // CRITICAL: do not use muted=true
+    a.muted = false;
+    a.volume = 0.001;
+    a.src = audioUrl();
+    this.audio = a;
+    return a;
   }
 
   async _resumeCtx() {
-    const ctx = this._ensureCtx();
-    if (ctx.state === "suspended") {
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (this.ctx.state === "suspended") {
       try {
-        await ctx.resume();
+        await this.ctx.resume();
       } catch {
         /* ignore */
       }
     }
-    return ctx;
+    return this.ctx;
   }
 
   async _loadBuffer() {
     if (this.buffer) return this.buffer;
     if (this._loading) return this._loading;
     this._loading = (async () => {
+      const ctx = await this._resumeCtx();
       const res = await fetch(audioUrl());
       const raw = await res.arrayBuffer();
-      const ctx = this._ensureCtx();
       this.buffer = await ctx.decodeAudioData(raw.slice(0));
       return this.buffer;
     })().catch((err) => {
-      console.warn("music decode failed", err);
+      console.warn("music decode", err);
       this._loading = null;
       return null;
     });
     return this._loading;
   }
 
-  _startSilentLoop() {
+  _ensureGain() {
+    if (!this.ctx) return null;
+    if (!this.gain) {
+      this.gain = this.ctx.createGain();
+      this.gain.gain.value = 0.001;
+      this.gain.connect(this.ctx.destination);
+    }
+    return this.gain;
+  }
+
+  _startWebLoop(volume = 0.001) {
     if (!this.buffer || !this.ctx) return false;
     try {
       if (this.source) {
         try {
+          this.source.onended = null;
           this.source.stop();
         } catch {
           /* ignore */
         }
-        this.source.disconnect();
+        try {
+          this.source.disconnect();
+        } catch {
+          /* ignore */
+        }
         this.source = null;
       }
-      if (!this.gain) {
-        this.gain = this.ctx.createGain();
-        this.gain.connect(this.ctx.destination);
-      }
-      this.gain.gain.value = 0.0001;
+      const g = this._ensureGain();
+      g.gain.value = volume;
       const src = this.ctx.createBufferSource();
       src.buffer = this.buffer;
       src.loop = true;
-      src.connect(this.gain);
+      src.connect(g);
       src.start(0);
       this.source = src;
-      this._armed = true;
       return true;
     } catch (err) {
-      console.warn("music silent loop failed", err);
+      console.warn("music webaudio loop", err);
       return false;
     }
   }
 
-  /** Call from a user gesture — arms silent looping track */
-  async unlock() {
-    const ctx = await this._resumeCtx();
+  _watchHtml() {
+    if (this._keepAlive) return;
+    this._keepAlive = setInterval(() => {
+      if (!this._armed || !this.audio) return;
+      // If browser paused the quiet loop, nudge it back
+      if (this.audio.paused) {
+        this.audio.play().catch(() => {});
+      }
+    }, 2000);
+  }
 
-    // Tiny beep unlocks AudioContext on stubborn mobile browsers
+  /** Call from user gestures */
+  async unlock() {
+    const a = this._ensureAudio();
+    a.muted = false;
+    if (a.volume < 0.001) a.volume = 0.001;
+
+    await this._resumeCtx();
     try {
-      const osc = ctx.createOscillator();
-      const g = ctx.createGain();
-      g.gain.value = 0.0001;
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      g.gain.value = 0.00001;
       osc.connect(g);
-      g.connect(ctx.destination);
+      g.connect(this.ctx.destination);
       osc.start();
-      osc.stop(ctx.currentTime + 0.02);
+      osc.stop(this.ctx.currentTime + 0.01);
     } catch {
       /* ignore */
     }
 
-    const buf = await this._loadBuffer();
-    if (buf) {
-      if (!this.source || !this._armed) {
-        this._startSilentLoop();
-      } else if (ctx.state === "running" && this.gain) {
-        this._armed = true;
+    try {
+      if (a.paused) {
+        await a.play();
       }
+      this._armed = true;
+      this._watchHtml();
+    } catch (err) {
+      console.warn("music html unlock", err);
     }
 
-    // Also arm HTMLAudio as backup
+    const buf = await this._loadBuffer();
+    if (buf && !this.source) {
+      this._startWebLoop(0.001);
+    }
+  }
+
+  /** Audible playback at finale */
+  async start() {
+    await this.unlock();
+
+    const a = this._ensureAudio();
+    a.muted = false;
+    a.volume = 1.0;
+
+    let htmlOk = false;
     try {
-      if (!this.audio) {
-        const a = new Audio(audioUrl());
-        a.loop = true;
-        a.preload = "auto";
-        a.playsInline = true;
-        a.setAttribute("playsinline", "");
-        a.muted = true;
-        a.volume = 0;
-        this.audio = a;
-      }
-      const a = this.audio;
-      a.muted = true;
-      a.volume = 0;
       if (a.paused) {
         a.currentTime = 0;
         await a.play();
       }
-      this._armed = true;
+      htmlOk = !a.paused;
+      this.playing = htmlOk;
     } catch (err) {
-      console.warn("music html arm failed", err);
+      console.warn("music html start", err);
     }
-  }
 
-  /** Audible playback at finale (may run outside a gesture) */
-  async start() {
-    if (this.playing && this.gain && this.gain.gain.value > 0.1) return;
-
+    // WebAudio path (often works even with iOS silent switch)
     await this._resumeCtx();
     const buf = await this._loadBuffer();
-
     if (buf) {
-      if (!this.source || !this._armed) {
-        this._startSilentLoop();
-      }
-      if (this.gain && this.source) {
+      if (!this.source) this._startWebLoop(0.001);
+      if (this.gain && this.source && this.ctx.state === "running") {
         const t = this.ctx.currentTime;
         try {
           this.gain.gain.cancelScheduledValues(t);
-          this.gain.gain.setValueAtTime(Math.max(0.0001, this.gain.gain.value), t);
-          this.gain.gain.linearRampToValueAtTime(0.72, t + 0.35);
+          this.gain.gain.setValueAtTime(Math.max(0.001, this.gain.gain.value), t);
+          this.gain.gain.linearRampToValueAtTime(1.0, t + 0.2);
         } catch {
-          this.gain.gain.value = 0.72;
+          this.gain.gain.value = 1.0;
         }
         this.playing = true;
-        this._armed = true;
-        return;
+      } else if (buf) {
+        this._startWebLoop(1.0);
+        this.playing = true;
       }
     }
 
-    // HTMLAudio unmute fallback
-    try {
-      if (!this.audio) {
-        const a = new Audio(audioUrl());
-        a.loop = true;
-        a.playsInline = true;
-        a.setAttribute("playsinline", "");
-        this.audio = a;
+    if (!htmlOk && !this.playing) {
+      try {
+        await this._fallbackSynth();
+      } catch (e2) {
+        console.warn("music synth", e2);
       }
-      const a = this.audio;
-      a.muted = false;
-      a.volume = 0.78;
-      if (a.paused) await a.play();
-      this.playing = true;
-      return;
-    } catch (err) {
-      console.warn("music html play failed", err);
     }
 
-    try {
-      await this._fallbackSynth();
-    } catch (e2) {
-      console.warn("music fallback failed", e2);
-    }
+    return this.playing || htmlOk || !a.paused;
+  }
+
+  /** True if something is actually outputting */
+  isAudible() {
+    const html =
+      this.audio &&
+      !this.audio.paused &&
+      !this.audio.muted &&
+      this.audio.volume > 0.05;
+    const web =
+      this.gain &&
+      this.source &&
+      this.ctx?.state === "running" &&
+      this.gain.gain.value > 0.05;
+    return !!(html || web || this.playing);
   }
 
   async _fallbackSynth() {
     const ctx = await this._resumeCtx();
+    if (ctx.state !== "running") return;
     this.playing = true;
 
     const MELODY = [
@@ -211,10 +250,10 @@ export class BirthdayMusic {
       const duration = dur * beat;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = "sine";
+      osc.type = "triangle";
       osc.frequency.setValueAtTime(FREQ[note], t);
       gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.32, t + 0.02);
+      gain.gain.linearRampToValueAtTime(0.55, t + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
       osc.connect(gain);
       gain.connect(ctx.destination);
@@ -222,7 +261,7 @@ export class BirthdayMusic {
       osc.stop(t + duration + 0.05);
       t += duration;
     }
-    const loopMs = Math.max(1000, (t - ctx.currentTime) * 1000 + 900);
+    const loopMs = Math.max(1000, (t - ctx.currentTime) * 1000 + 800);
     this._loopId = setTimeout(() => {
       if (this.playing) this._fallbackSynth();
     }, loopMs);
@@ -232,32 +271,25 @@ export class BirthdayMusic {
     this.playing = false;
     this._armed = false;
     if (this._loopId) clearTimeout(this._loopId);
+    if (this._keepAlive) {
+      clearInterval(this._keepAlive);
+      this._keepAlive = null;
+    }
     if (this.source) {
       try {
         this.source.stop();
       } catch {
         /* ignore */
       }
-      try {
-        this.source.disconnect();
-      } catch {
-        /* ignore */
-      }
       this.source = null;
     }
-    if (this.gain) {
-      try {
-        this.gain.gain.value = 0;
-      } catch {
-        /* ignore */
-      }
-    }
+    if (this.gain) this.gain.gain.value = 0;
     if (this.audio) {
       try {
         this.audio.pause();
         this.audio.currentTime = 0;
-        this.audio.muted = true;
-        this.audio.volume = 0;
+        this.audio.volume = 0.001;
+        this.audio.muted = false;
       } catch {
         /* ignore */
       }
