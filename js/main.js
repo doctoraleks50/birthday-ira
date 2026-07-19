@@ -65,7 +65,7 @@ async function goBouquet() {
   show($("#bouquet-ui"));
   $("#take-btn").classList.add("hidden");
   $("#bouquet-hint")?.classList.remove("hidden");
-  exp.startBouquetApproach();
+  await exp.startBouquetApproach();
 }
 
 exp.onTakeReady = () => {
