@@ -21,6 +21,7 @@ function makeCard(tex, w, h) {
   const mat = new THREE.MeshBasicMaterial({
     map: tex,
     transparent: true,
+    alphaTest: 0.12,
     depthWrite: false,
     side: THREE.DoubleSide,
   });

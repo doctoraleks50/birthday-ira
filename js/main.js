@@ -64,7 +64,6 @@ async function goBouquet() {
   hide($("#greeting"));
   show($("#bouquet-ui"));
   $("#take-btn").classList.add("hidden");
-  $("#bouquet-hint")?.classList.remove("hidden");
   await exp.startBouquetApproach();
 }
 
@@ -91,7 +90,6 @@ async function takeBouquet() {
   try { await music.unlock(); } catch { /* ignore */ }
   $("#take-btn").classList.add("hidden");
   $("#bouquet-ui .scene-caption")?.classList.add("fade-out");
-  $("#bouquet-hint")?.classList.add("fade-out");
   exp.takeBouquet();
 }
 
@@ -176,12 +174,29 @@ async function showFinale() {
   el.classList.remove("finale-in");
   el.offsetHeight;
   el.classList.add("finale-in");
-  // Audio was armed muted on earlier gestures — just unmute / play
-  try {
-    await music.start();
-  } catch (err) {
-    console.warn("music", err);
-  }
+
+  const tryMusic = async () => {
+    try {
+      await music.start();
+    } catch (err) {
+      console.warn("music", err);
+    }
+  };
+  await tryMusic();
+  // Retry in case context was still suspending
+  setTimeout(tryMusic, 400);
+  setTimeout(tryMusic, 1200);
+
+  // Last resort: tap finale to hear music (gesture)
+  const onTap = async () => {
+    try {
+      await music.unlock();
+      await music.start();
+    } catch {
+      /* ignore */
+    }
+  };
+  $("#finale").addEventListener("pointerdown", onTap, { once: true });
 }
 
 exp.onAllCandlesOut = () => {
