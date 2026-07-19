@@ -127,7 +127,7 @@ export class Experience3D {
     this.scene.add(bg);
   }
 
-  startBouquetApproach() {
+  async startBouquetApproach() {
     this.mode = "bouquet";
     this._takeReady = false;
     this._setBouquetBackdrop();
@@ -137,22 +137,28 @@ export class Experience3D {
       this.bouquet = null;
     }
 
-    this.bouquet = createBouquet();
-    this.bouquet.position.set(0, -0.2, 0);
-    this.bouquet.rotation.y = 0.2;
-    this._userRot = { x: -0.1, y: 0.25 };
+    try {
+      this.bouquet = await createBouquet();
+    } catch (err) {
+      console.error("bouquet photos failed", err);
+      this.bouquet = new THREE.Group();
+      this.bouquet.userData.wrap = this.bouquet;
+    }
+    this.bouquet.position.set(0, -0.15, 0);
+    this.bouquet.rotation.y = 0.15;
+    this._userRot = { x: 0.0, y: 0.12 };
     this.scene.add(this.bouquet);
 
     this._buildBalloons();
     this._buildConfetti();
 
     // Start far — end close enough to fill frame with bouquet + balloons above
-    this.camera.position.set(0.3, 1.2, 26);
-    this.camera.lookAt(0, 0.6, 0);
+    this.camera.position.set(0.2, 1.0, 24);
+    this.camera.lookAt(0, 0.55, 0);
     this._camFrom = this.camera.position.clone();
-    this._camTo = new THREE.Vector3(0.2, 1.1, 6.2);
+    this._camTo = new THREE.Vector3(0.1, 0.85, 5.0);
     this._approachT = 0;
-    this._approachDur = 6.5;
+    this._approachDur = 6.2;
   }
 
   takeBouquet() {
@@ -409,18 +415,36 @@ export class Experience3D {
     const wrap = this.bouquet.userData.wrap || this.bouquet;
 
     // User drag rotation + gentle breathe (no auto spin fighting the drag)
-    const swayY = this._drag.active ? 0 : Math.sin(t * 0.35) * 0.04;
-    const swayX = this._drag.active ? 0 : Math.sin(t * 0.28) * 0.02;
+    const swayY = this._drag.active ? 0 : Math.sin(t * 0.35) * 0.03;
+    const swayX = this._drag.active ? 0 : Math.sin(t * 0.28) * 0.015;
     wrap.rotation.y = this._userRot.y + swayY;
     wrap.rotation.x = this._userRot.x + swayX;
-    wrap.position.y = Math.sin(t * 0.9) * 0.04;
+    wrap.position.y = Math.sin(t * 0.9) * 0.03;
 
-    // Petal micro-motion
-    wrap.traverse((obj) => {
-      if (obj.userData?.bloom) {
-        obj.userData.bloom.rotation.y = Math.sin(t * 0.5 + obj.userData.phase) * 0.03;
-      }
-    });
+    // Photo bouquet: crossfade front / 3-4 / top from tilt & yaw
+    const cards = this.bouquet.userData.cards;
+    if (cards) {
+      const yaw = Math.abs(wrap.rotation.y);
+      const pitch = wrap.rotation.x; // negative = tip toward camera somewhat; positive = look down
+      let topW = Math.max(0, Math.min(1, (pitch - 0.25) / 0.55));
+      let sideW = Math.max(0, Math.min(1, (yaw - 0.2) / 0.7)) * (1 - topW);
+      let frontW = Math.max(0, 1 - sideW - topW);
+      const sum = frontW + sideW + topW || 1;
+      frontW /= sum; sideW /= sum; topW /= sum;
+      cards.front.material.opacity = frontW;
+      cards.threeQ.material.opacity = sideW;
+      cards.top.material.opacity = topW;
+      cards.front.visible = frontW > 0.02;
+      cards.threeQ.visible = sideW > 0.02;
+      cards.top.visible = topW > 0.02;
+    } else {
+      // Procedural fallback micro-motion
+      wrap.traverse((obj) => {
+        if (obj.userData?.bloom) {
+          obj.userData.bloom.rotation.y = Math.sin(t * 0.5 + obj.userData.phase) * 0.03;
+        }
+      });
+    }
 
     // Helium balloons float gently (strings are children — move with balloon)
     if (this.balloonGroup) {
