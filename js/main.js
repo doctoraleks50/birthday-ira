@@ -175,28 +175,32 @@ async function showFinale() {
   el.offsetHeight;
   el.classList.add("finale-in");
 
+  const musicBtn = $("#music-btn");
+  musicBtn?.classList.remove("hidden");
+
   const tryMusic = async () => {
     try {
       await music.start();
+      if (music.isAudible()) musicBtn?.classList.add("hidden");
     } catch (err) {
       console.warn("music", err);
     }
   };
   await tryMusic();
-  // Retry in case context was still suspending
-  setTimeout(tryMusic, 400);
-  setTimeout(tryMusic, 1200);
+  setTimeout(tryMusic, 350);
+  setTimeout(tryMusic, 1000);
 
-  // Last resort: tap finale to hear music (gesture)
-  const onTap = async () => {
+  // Keep button as reliable gesture fallback (phones often block autoplay)
+  musicBtn?.addEventListener("click", async (e) => {
+    e.preventDefault();
     try {
       await music.unlock();
       await music.start();
-    } catch {
-      /* ignore */
+      musicBtn.classList.add("hidden");
+    } catch (err) {
+      console.warn("music btn", err);
     }
-  };
-  $("#finale").addEventListener("pointerdown", onTap, { once: true });
+  });
 }
 
 exp.onAllCandlesOut = () => {
