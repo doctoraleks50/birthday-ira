@@ -119,7 +119,6 @@ function renderQuestion() {
   const ta = $("#questions-answer");
   ta.value = answers[q.id] || "";
   ta.placeholder = q.placeholder || "";
-  ta.focus({ preventScroll: true });
 
   const prog = $("#questions-progress");
   prog.innerHTML = "";
@@ -129,8 +128,7 @@ function renderQuestion() {
     prog.appendChild(dot);
   });
 
-  const nextBtn = $("#questions-next");
-  nextBtn.textContent = questionIndex >= list.length - 1 ? "Далі до сюрпризу" : "Далі";
+  $("#questions-next").textContent = "Далі";
 }
 
 function storeCurrentAnswer() {
