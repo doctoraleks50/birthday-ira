@@ -165,7 +165,16 @@ async function advanceQuestion({ skip = false } = {}) {
     return;
   }
 
-  // Done — soft bridge into cake surprise
+  // Last answer: unlock audio + mic on this gesture, then soft bridge to cake
+  try { await music.unlock(); } catch { /* ignore */ }
+  try {
+    await blow.start();
+    micReady = true;
+  } catch (err) {
+    micReady = false;
+    console.warn("mic", err);
+  }
+
   const panel = $("#questions .questions-panel");
   panel?.classList.add("questions-done");
   $("#questions-prompt").textContent = CONFIG.questionsDone || "Дякую 🤍";
@@ -175,25 +184,11 @@ async function advanceQuestion({ skip = false } = {}) {
   $("#questions-progress")?.classList.add("hidden");
   $("#questions-kicker").textContent = "";
 
-  setTimeout(() => goSurprise(), 1400);
+  setTimeout(() => enterCake(), 1400);
 }
 
-/** After questions: mic + unlock audio, then surprise cake */
-async function goSurprise() {
-  try {
-    await music.unlock();
-  } catch (err) {
-    console.warn("audio unlock", err);
-  }
-
-  try {
-    await blow.start();
-    micReady = true;
-  } catch (err) {
-    micReady = false;
-    console.warn("mic", err);
-  }
-
+/** Cake surprise after questions (mic may already be armed on last tap) */
+async function enterCake() {
   hide($("#questions"));
   hide($("#wish-ui"));
   show($("#cake-ui"));
