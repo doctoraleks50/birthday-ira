@@ -14,6 +14,18 @@ const music = new BirthdayMusic();
 let blowLoop = null;
 let cakeDone = false;
 let micReady = false;
+let questionIndex = 0;
+const answers = {};
+
+const STORAGE_KEY = "birthday-ira-answers";
+
+function saveAnswers() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(answers));
+  } catch {
+    /* ignore */
+  }
+}
 
 /** Word reveal — spaces stay as text nodes (inline-block ate the spaces before) */
 function revealParagraph(el, text, wordDelay = 55) {
@@ -80,7 +92,7 @@ exp.onBouquetGone = () => {
   $("#wish-text").classList.add("fade-in");
   exp.startStars();
   setTimeout(() => {
-    const btn = $("#next-surprise-btn");
+    const btn = $("#next-questions-btn");
     btn.classList.remove("hidden");
     btn.classList.add("pop-in");
   }, 3500);
@@ -93,9 +105,81 @@ async function takeBouquet() {
   exp.takeBouquet();
 }
 
-/** «Далі» після зірок: mic + unlock audio (for finale music), then surprise cake */
+function renderQuestion() {
+  const list = CONFIG.questions || [];
+  const q = list[questionIndex];
+  if (!q) return;
+
+  $("#questions-kicker").textContent = `${questionIndex + 1} / ${list.length}`;
+  $("#questions-title").textContent = CONFIG.questionsTitle;
+  $("#questions-intro").textContent =
+    questionIndex === 0 ? (CONFIG.questionsIntro || "") : "";
+  $("#questions-prompt").textContent = q.prompt;
+
+  const ta = $("#questions-answer");
+  ta.value = answers[q.id] || "";
+  ta.placeholder = q.placeholder || "";
+  ta.focus({ preventScroll: true });
+
+  const prog = $("#questions-progress");
+  prog.innerHTML = "";
+  list.forEach((_, i) => {
+    const dot = document.createElement("span");
+    dot.className = "q-dot" + (i === questionIndex ? " active" : i < questionIndex ? " done" : "");
+    prog.appendChild(dot);
+  });
+
+  const nextBtn = $("#questions-next");
+  nextBtn.textContent = questionIndex >= list.length - 1 ? "Далі до сюрпризу" : "Далі";
+}
+
+function storeCurrentAnswer() {
+  const list = CONFIG.questions || [];
+  const q = list[questionIndex];
+  if (!q) return;
+  answers[q.id] = ($("#questions-answer").value || "").trim();
+  saveAnswers();
+}
+
+async function goQuestions() {
+  try { await music.unlock(); } catch { /* ignore */ }
+  hide($("#wish-ui"));
+  show($("#questions"));
+  questionIndex = 0;
+  renderQuestion();
+}
+
+async function advanceQuestion({ skip = false } = {}) {
+  if (!skip) storeCurrentAnswer();
+  else {
+    const list = CONFIG.questions || [];
+    const q = list[questionIndex];
+    if (q && answers[q.id] == null) answers[q.id] = "";
+    saveAnswers();
+  }
+
+  const list = CONFIG.questions || [];
+  if (questionIndex < list.length - 1) {
+    questionIndex += 1;
+    renderQuestion();
+    return;
+  }
+
+  // Done — soft bridge into cake surprise
+  const panel = $("#questions .questions-panel");
+  panel?.classList.add("questions-done");
+  $("#questions-prompt").textContent = CONFIG.questionsDone || "Дякую 🤍";
+  $("#questions-intro").textContent = "";
+  $("#questions-answer").classList.add("hidden");
+  $("#questions-actions")?.classList.add("hidden");
+  $("#questions-progress")?.classList.add("hidden");
+  $("#questions-kicker").textContent = "";
+
+  setTimeout(() => goSurprise(), 1400);
+}
+
+/** After questions: mic + unlock audio, then surprise cake */
 async function goSurprise() {
-  // Unlock audio on this user gesture so Happy Birthday can play later
   try {
     await music.unlock();
   } catch (err) {
@@ -110,6 +194,7 @@ async function goSurprise() {
     console.warn("mic", err);
   }
 
+  hide($("#questions"));
   hide($("#wish-ui"));
   show($("#cake-ui"));
   exp.startCake();
@@ -216,5 +301,7 @@ exp.onAllCandlesOut = () => {
 $("#open-btn").addEventListener("click", openGreeting);
 $("#next-btn").addEventListener("click", goBouquet);
 $("#take-btn").addEventListener("click", takeBouquet);
-$("#next-surprise-btn").addEventListener("click", goSurprise);
+$("#next-questions-btn").addEventListener("click", goQuestions);
+$("#questions-next").addEventListener("click", () => advanceQuestion({ skip: false }));
+$("#questions-skip").addEventListener("click", () => advanceQuestion({ skip: true }));
 $("#mic-btn").addEventListener("click", enableMic);
